@@ -1,6 +1,6 @@
 # Leafmark
 
-Leafmark is a free, privacy-first book-summary web app. A reader brings a PDF or EPUB they have the right to use; the browser extracts its selectable text and builds four views without sending the book to a server.
+Leafmark is a privacy-first book-summary web app. A reader brings a PDF or EPUB they have the right to use and chooses local processing or connects their own free, paid, local, or self-hosted AI model.
 
 Public site: https://utsapoddar.github.io/leafmark/
 
@@ -25,17 +25,20 @@ Reading times are estimates, not limits. A short story can produce a guide under
 
 Leafmark combines the useful interaction patterns—quick overview, idea cards, and chapter depth—but uses a bring-your-own-book model so it does not need to license, host, or distribute a commercial catalog.
 
-## Free architecture
+## Bring your own model
 
-The current release has no metered API and no app database. PDF parsing uses PDF.js, EPUB parsing uses JSZip and browser DOM APIs, and summarization runs on the reader's device. Static hosting can therefore stay within common free tiers.
+The current release has no metered API and no app database. PDF parsing uses PDF.js, EPUB parsing uses JSZip and browser DOM APIs, and the current extractive engine runs on the reader's device. Static hosting can therefore stay within common free tiers.
+
+The planned [provider kernel](docs/provider-kernel.md) lets each reader connect a free API key, paid API key, local model, or self-hosted OpenAI-compatible endpoint. Leafmark owns the summarization mechanics while provider adapters translate them for the selected model. Credentials belong to each reader and are never included in the public site.
 
 Future improvements should preserve the same boundary:
 
 1. Add opt-in browser OCR for scanned pages.
 2. Add an optional on-device language model for abstractive summaries on capable hardware.
-3. Add a question mode whose answers always cite extracted sections.
-4. Store a local library in IndexedDB, with explicit delete controls.
-5. Add [Lecture Mode](docs/lecture-mode.md): a source-grounded teaching sequence that explains one idea at a time, checks recall, adapts the next explanation, and never advances silently past a misunderstanding.
+3. Implement the provider kernel and source-grounded content ledger.
+4. Add a question mode whose answers always cite extracted sections.
+5. Store a local library in IndexedDB, with explicit delete controls.
+6. Add [Lecture Mode](docs/lecture-mode.md): a source-grounded teaching sequence that explains one idea at a time, checks recall, adapts the next explanation, and never advances silently past a misunderstanding.
 
 Do not build a public repository of user-generated summaries for copyrighted books without a separate rights and legal review. Keep uploads and generated guides private by default.
 
