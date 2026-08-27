@@ -6,9 +6,16 @@ import { BookGuide, processBook, SummaryItem } from '../lib/book-processor';
 const summaryModes = [
   { name: 'Snapshot', time: '2 min', description: 'The book in one clear page' },
   { name: 'Key ideas', time: '8 min', description: 'The arguments worth remembering' },
-  { name: 'Chapter guide', time: '20 min', description: 'A map of every chapter' },
-  { name: 'Deep dive', time: '45 min', description: 'Nuance, examples, and connections' },
+  { name: 'Chapter guide', time: '1–3 hr', description: 'Every chapter, with arguments, examples, and context' },
+  { name: 'Deep dive', time: '3–5 hr', description: 'The fullest guide: nuance, evidence, and connections' },
 ];
+
+const formatDuration = (minutes: number) => {
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return remainder ? `${hours} hr ${remainder} min` : `${hours} hr`;
+};
 
 type Status = 'idle' | 'processing' | 'ready' | 'error';
 
@@ -63,6 +70,11 @@ function ResultList({ items, deep = false }: { items: SummaryItem[]; deep?: bool
 }
 
 function GuideView({ guide, mode, setMode, onReset }: { guide: BookGuide; mode: number; setMode: (mode: number) => void; onReset: () => void }) {
+  const guideModes = summaryModes.map((item, index) => ({
+    ...item,
+    time: index === 2 ? formatDuration(guide.chapterGuideMinutes) : index === 3 ? formatDuration(guide.deepDiveMinutes) : item.time,
+  }));
+
   const exportGuide = () => {
     const lines = [
       `# ${guide.title}`,
@@ -74,6 +86,8 @@ function GuideView({ guide, mode, setMode, onReset }: { guide: BookGuide; mode: 
       ...guide.keyIdeas.flatMap((item) => [`### ${item.title}`, `${item.text} (${item.source})`, '']),
       '## Chapter guide',
       ...guide.chapters.flatMap((item) => [`### ${item.title}`, `${item.text} (${item.source})`, '']),
+      '## Deep dive',
+      ...guide.deepDive.flatMap((item) => [`### ${item.title}`, `${item.text} (${item.source})`, '']),
     ];
     const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
@@ -91,7 +105,7 @@ function GuideView({ guide, mode, setMode, onReset }: { guide: BookGuide; mode: 
           <p className="rail-label">This book</p>
           <div className="mini-book"><span>PDF</span><div><b>{guide.title}</b><small>{guide.fileName}</small></div></div>
           <nav className="guide-nav" aria-label="Summary views">
-            {summaryModes.map((item, index) => (
+            {guideModes.map((item, index) => (
               <button className={mode === index ? 'active' : ''} onClick={() => setMode(index)} key={item.name} type="button">
                 <span>{index === 0 ? '◐' : index === 1 ? '✦' : index === 2 ? '≡' : '◎'}</span>
                 <span>{item.name}<small>{item.time}</small></span>
@@ -113,7 +127,7 @@ function GuideView({ guide, mode, setMode, onReset }: { guide: BookGuide; mode: 
         </div>
 
         <div className="mobile-mode-tabs" role="tablist" aria-label="Summary views">
-          {summaryModes.map((item, index) => <button role="tab" aria-selected={mode === index} className={mode === index ? 'active' : ''} onClick={() => setMode(index)} key={item.name}>{item.name}</button>)}
+          {guideModes.map((item, index) => <button role="tab" aria-selected={mode === index} className={mode === index ? 'active' : ''} onClick={() => setMode(index)} key={item.name}>{item.name}</button>)}
         </div>
 
         {mode === 0 && (
@@ -127,8 +141,8 @@ function GuideView({ guide, mode, setMode, onReset }: { guide: BookGuide; mode: 
           </article>
         )}
         {mode === 1 && <><div className="section-intro"><h2>{guide.keyIdeas.length} ideas worth keeping</h2><p>Each idea is linked to its place in the uploaded book.</p></div><ResultList items={guide.keyIdeas} /></>}
-        {mode === 2 && <><div className="section-intro"><h2>Chapter by chapter</h2><p>A navigable map for reviewing the book in sequence.</p></div><ResultList items={guide.chapters} deep /></>}
-        {mode === 3 && <><div className="section-intro"><h2>The deep reading pass</h2><p>More context and supporting detail, without repeating the full book.</p></div><ResultList items={guide.deepDive} deep /></>}
+        {mode === 2 && <><div className="section-intro"><h2>Chapter by chapter</h2><p>A detailed, sequential companion with about {formatDuration(guide.chapterGuideMinutes)} of reading.</p></div><ResultList items={guide.chapters} deep /></>}
+        {mode === 3 && <><div className="section-intro"><h2>The deep reading pass</h2><p>The fullest source-grounded guide, with about {formatDuration(guide.deepDiveMinutes)} of context, evidence, and connections.</p></div><ResultList items={guide.deepDive} deep /></>}
       </section>
     </div>
   );

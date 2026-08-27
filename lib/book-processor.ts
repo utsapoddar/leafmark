@@ -19,6 +19,8 @@ export type BookGuide = {
   fileName: string;
   wordCount: number;
   readingMinutes: number;
+  chapterGuideMinutes: number;
+  deepDiveMinutes: number;
   snapshot: string;
   keyIdeas: SummaryItem[];
   chapters: SummaryItem[];
@@ -36,8 +38,9 @@ const sentencesOf = (text: string) => {
 };
 
 const wordsOf = (text: string) => (text.toLowerCase().match(/[a-z][a-z'-]{2,}/g) ?? []).filter((word) => !STOP_WORDS.has(word));
+const countWords = (text: string) => text.split(/\s+/).filter(Boolean).length;
 
-function rankedSentences(text: string, limit: number) {
+function rankedSentenceCandidates(text: string) {
   const sentences = sentencesOf(text);
   if (!sentences.length) return [];
   const frequencies = new Map<string, number>();
@@ -52,11 +55,34 @@ function rankedSentences(text: string, limit: number) {
       const usableLength = sentence.length >= 80 && sentence.length <= 280 ? .08 : 0;
       return { sentence, index, score: lexical + position + usableLength };
     })
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => b.score - a.score);
+}
+
+function rankedSentences(text: string, limit: number) {
+  return rankedSentenceCandidates(text)
     .slice(0, limit)
     .sort((a, b) => a.index - b.index)
     .map((item) => item.sentence);
 }
+
+function rankedSentencesToWords(text: string, targetWords: number) {
+  const selected: ReturnType<typeof rankedSentenceCandidates> = [];
+  let selectedWords = 0;
+
+  for (const candidate of rankedSentenceCandidates(text)) {
+    if (selectedWords >= targetWords && selected.length) break;
+    selected.push(candidate);
+    selectedWords += countWords(candidate.sentence);
+  }
+
+  return selected
+    .sort((a, b) => a.index - b.index)
+    .map((item) => item.sentence);
+}
+
+const depthWordTarget = (bookWords: number, share: number, minMinutes: number, maxMinutes: number) => (
+  Math.min(bookWords, Math.max(minMinutes * 230, Math.min(maxMinutes * 230, Math.round(bookWords * share))))
+);
 
 const makeTitle = (sentence: string, fallback: string) => {
   const clean = sentence.replace(/^[-–—\d.)\s]+/, '').split(/[;:.!?]/)[0].trim();
@@ -150,7 +176,7 @@ async function extractEpub(file: File): Promise<{ title?: string; segments: Sour
 
 function createGuide(file: File, title: string | undefined, segments: SourceSegment[]): BookGuide {
   const fullText = segments.map((segment) => segment.text).join(' ');
-  const wordCount = fullText.split(/\s+/).filter(Boolean).length;
+  const wordCount = countWords(fullText);
   if (wordCount < 600) throw new Error('Not enough selectable text was found. This may be a scanned PDF; OCR support is planned next.');
 
   const snapshot = rankedSentences(fullText, 7).join(' ');
@@ -161,21 +187,33 @@ function createGuide(file: File, title: string | undefined, segments: SourceSegm
     source: segment.source,
   }));
 
-  const chapters = segments.slice(0, 60).map((segment) => {
-    const summary = rankedSentences(segment.text, 3).join(' ');
-    return { title: segment.title, text: summary || normalize(segment.text).slice(0, 420), source: segment.source };
+  const chapterTargetWords = depthWordTarget(wordCount, .35, 60, 180);
+  const deepDiveTargetWords = depthWordTarget(wordCount, .72, 180, 300);
+
+  const chapters = segments.map((segment) => {
+    const segmentWords = countWords(segment.text);
+    const targetWords = Math.max(120, Math.round(chapterTargetWords * (segmentWords / wordCount)));
+    const summary = rankedSentencesToWords(segment.text, targetWords).join(' ');
+    return { title: segment.title, text: summary || normalize(segment.text).slice(0, targetWords * 6), source: segment.source };
   });
 
-  const deepDive = segments.slice(0, 24).map((segment) => {
-    const summary = rankedSentences(segment.text, 5).join(' ');
-    return { title: segment.title, text: summary || normalize(segment.text).slice(0, 700), source: segment.source };
+  const deepDive = segments.map((segment) => {
+    const segmentWords = countWords(segment.text);
+    const targetWords = Math.max(240, Math.round(deepDiveTargetWords * (segmentWords / wordCount)));
+    const summary = rankedSentencesToWords(segment.text, targetWords).join(' ');
+    return { title: segment.title, text: summary || normalize(segment.text).slice(0, targetWords * 6), source: segment.source };
   });
+
+  const chapterGuideMinutes = Math.max(1, Math.round(chapters.reduce((total, item) => total + countWords(item.text), 0) / 230));
+  const deepDiveMinutes = Math.max(1, Math.round(deepDive.reduce((total, item) => total + countWords(item.text), 0) / 230));
 
   return {
     title: title || file.name.replace(/\.(pdf|epub)$/i, ''),
     fileName: file.name,
     wordCount,
     readingMinutes: Math.max(1, Math.round(wordCount / 230)),
+    chapterGuideMinutes,
+    deepDiveMinutes,
     snapshot,
     keyIdeas,
     chapters,
