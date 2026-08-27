@@ -80,9 +80,7 @@ function rankedSentencesToWords(text: string, targetWords: number) {
     .map((item) => item.sentence);
 }
 
-const depthWordTarget = (bookWords: number, share: number, minMinutes: number, maxMinutes: number) => (
-  Math.min(bookWords, Math.max(minMinutes * 230, Math.min(maxMinutes * 230, Math.round(bookWords * share))))
-);
+const depthWordTarget = (bookWords: number, share: number) => Math.min(bookWords, Math.round(bookWords * share));
 
 const makeTitle = (sentence: string, fallback: string) => {
   const clean = sentence.replace(/^[-–—\d.)\s]+/, '').split(/[;:.!?]/)[0].trim();
@@ -187,8 +185,8 @@ function createGuide(file: File, title: string | undefined, segments: SourceSegm
     source: segment.source,
   }));
 
-  const chapterTargetWords = depthWordTarget(wordCount, .55, 60, 180);
-  const deepDiveTargetWords = depthWordTarget(wordCount, .80, 180, 300);
+  const chapterTargetWords = depthWordTarget(wordCount, .55);
+  const deepDiveTargetWords = depthWordTarget(wordCount, .80);
 
   const chapters = segments.map((segment) => {
     const segmentWords = countWords(segment.text);
