@@ -78,7 +78,8 @@ export async function discoverModels(connection: Omit<ModelConnection, 'model'>)
         .map((model) => ({ id: (model.name ?? '').replace(/^models\//, ''), label: model.displayName || (model.name ?? '').replace(/^models\//, '') }))
     : (payload.data ?? []).map((model) => ({ id: model.id ?? '', label: model.id ?? '' }));
 
-  const usable = models.filter((model) => model.id);
+  const nonChatModel = /(?:^|[-_/.])(whisper|embed(?:ding)?s?|tts|speech|transcri(?:be|ption)|rerank)(?:$|[-_/.])/i;
+  const usable = models.filter((model) => model.id && !nonChatModel.test(model.id));
   if (!usable.length) throw new Error('The connection worked, but it returned no text-generation models.');
   return usable.sort((a, b) => a.label.localeCompare(b.label));
 }

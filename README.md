@@ -29,13 +29,13 @@ Leafmark combines the useful interaction patterns—quick overview, idea cards, 
 
 The current release has no metered API and no app database. PDF parsing uses PDF.js, EPUB parsing uses JSZip and browser DOM APIs, and the current extractive engine runs on the reader's device. Static hosting can therefore stay within common free tiers.
 
-The planned [provider kernel](docs/provider-kernel.md) lets each reader connect a free API key, paid API key, local model, or self-hosted OpenAI-compatible endpoint. Leafmark owns the summarization mechanics while provider adapters translate them for the selected model. Credentials belong to each reader and are never included in the public site.
+The implemented [provider kernel](docs/provider-kernel.md) lets each reader connect a free API key, paid API key, or self-hosted OpenAI-compatible endpoint. It extracts and labels source sentences locally, asks the selected model for a validated content ledger, synthesizes the short views, and assembles the long source-grounded views on the reader's device. Credentials belong to each reader and are never included in the public site.
 
 Future improvements should preserve the same boundary:
 
 1. Add opt-in browser OCR for scanned pages.
 2. Add an optional on-device language model for abstractive summaries on capable hardware.
-3. Implement the provider kernel and source-grounded content ledger.
+3. Add an explicitly enabled persistent checkpoint with clear deletion controls; the current checkpoint is tab-memory only.
 4. Add a question mode whose answers always cite extracted sections.
 5. Store a local library in IndexedDB, with explicit delete controls.
 6. Add [Lecture Mode](docs/lecture-mode.md): a source-grounded teaching sequence that explains one idea at a time, checks recall, adapts the next explanation, and never advances silently past a misunderstanding.

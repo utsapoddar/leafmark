@@ -46,7 +46,7 @@ export default function PrivacyPage() {
           <section>
             <h2>3. When an AI provider receives content</h2>
             <p>Leafmark asks for explicit consent before enabling AI reading. Once enabled, the selected service may receive your API key, book excerpts needed for the request, model settings, and ordinary network metadata. That provider&apos;s own terms, privacy practices, retention rules, training policies, and charges apply. Leafmark does not control them.</p>
-            <p><b>Current-release note:</b> the connection test is available, but reading guides still use Leafmark&apos;s local extractor. Book excerpts will not be sent for guide generation until the semantic provider kernel is enabled.</p>
+            <p>For AI reading, Leafmark sends bounded, source-labeled excerpts rather than the uploaded file itself. The provider classifies those excerpts into a content ledger; Leafmark validates the returned source IDs and assembles the reading depths locally.</p>
           </section>
 
           <section>

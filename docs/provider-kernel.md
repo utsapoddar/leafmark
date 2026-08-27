@@ -97,3 +97,16 @@ One developer's key is used only for that developer's test. Every Leafmark reade
 4. WebLLM as a keyless on-device adapter.
 5. Existing extractive processor as the universal offline fallback.
 
+## Implemented browser kernel
+
+The current GitHub Pages release implements the first production slice of this design:
+
+- native Gemini `generateContent` and generic OpenAI-compatible chat-completions adapters;
+- conservative, source-labeled chunking that works without a provider-specific context database;
+- a validated ledger of sentence importance and source-grounded insights;
+- JSON repair, bounded transient-error retries, and actionable provider errors;
+- an in-memory per-chunk checkpoint that survives retries and provider changes within the tab;
+- a separate ledger synthesis pass for Snapshot and Key Ideas; and
+- local assembly of Chapter Guide and Deep Dive at approximately 55% and 80% source coverage.
+
+The checkpoint deliberately does not persist book material to browser storage. A future encrypted or explicitly enabled persistent checkpoint requires a corresponding privacy-policy and deletion-control update.

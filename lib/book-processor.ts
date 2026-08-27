@@ -1,4 +1,6 @@
 import JSZip from 'jszip';
+import type { ModelConnection } from './model-providers';
+import type { SemanticProgress } from './semantic-kernel';
 
 export type SourceSegment = {
   title: string;
@@ -102,7 +104,7 @@ const zipPath = (baseFile: string, relative: string) => {
   return resolved.join('/');
 };
 
-async function extractPdf(file: File): Promise<{ title?: string; segments: SourceSegment[] }> {
+async function extractPdf(file: File, onProgress?: (progress: SemanticProgress) => void): Promise<{ title?: string; segments: SourceSegment[] }> {
   const pdfjs = await import('pdfjs-dist');
   pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
   const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
@@ -110,6 +112,7 @@ async function extractPdf(file: File): Promise<{ title?: string; segments: Sourc
   const pages: SourceSegment[] = [];
 
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    onProgress?.({ phase: 'extracting', completed: pageNumber - 1, total: pdf.numPages, message: `Reading page ${pageNumber} of ${pdf.numPages} locally` });
     const page = await pdf.getPage(pageNumber);
     const content = await page.getTextContent();
     const text = normalize(content.items.map((item) => ('str' in item ? item.str : '')).join(' '));
@@ -134,7 +137,7 @@ async function extractPdf(file: File): Promise<{ title?: string; segments: Sourc
   return { title: info?.Title, segments };
 }
 
-async function extractEpub(file: File): Promise<{ title?: string; segments: SourceSegment[] }> {
+async function extractEpub(file: File, onProgress?: (progress: SemanticProgress) => void): Promise<{ title?: string; segments: SourceSegment[] }> {
   const zip = await JSZip.loadAsync(await file.arrayBuffer());
   const containerText = await zip.file('META-INF/container.xml')?.async('text');
   if (!containerText) throw new Error('This EPUB is missing its book index.');
@@ -156,6 +159,7 @@ async function extractEpub(file: File): Promise<{ title?: string; segments: Sour
   const segments: SourceSegment[] = [];
   const spine = [...opf.querySelectorAll('spine itemref')];
   for (let index = 0; index < spine.length; index += 1) {
+    onProgress?.({ phase: 'extracting', completed: index, total: spine.length, message: `Reading EPUB section ${index + 1} of ${spine.length} locally` });
     const id = spine[index].getAttribute('idref');
     const href = id ? manifest.get(id) : undefined;
     if (!href) continue;
@@ -219,8 +223,22 @@ function createGuide(file: File, title: string | undefined, segments: SourceSegm
   };
 }
 
-export async function processBook(file: File): Promise<BookGuide> {
+export type ProcessBookOptions = {
+  connection?: ModelConnection | null;
+  onProgress?: (progress: SemanticProgress) => void;
+};
+
+export async function processBook(file: File, options: ProcessBookOptions = {}): Promise<BookGuide> {
   const extension = file.name.split('.').pop()?.toLowerCase();
-  const extracted = extension === 'epub' ? await extractEpub(file) : await extractPdf(file);
+  const extracted = extension === 'epub' ? await extractEpub(file, options.onProgress) : await extractPdf(file, options.onProgress);
+  if (options.connection) {
+    const { createSemanticGuide } = await import('./semantic-kernel');
+    return createSemanticGuide({
+      title: extracted.title || file.name.replace(/\.(pdf|epub)$/i, ''),
+      fileName: file.name,
+      segments: extracted.segments,
+    }, options.connection, options.onProgress);
+  }
+  options.onProgress?.({ phase: 'assembling', completed: 1, total: 1, message: 'Building the local extractive guide on this device' });
   return createGuide(file, extracted.title, extracted.segments);
 }
