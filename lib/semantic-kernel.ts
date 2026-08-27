@@ -155,6 +155,7 @@ async function fetchWithRetry(fetcher: typeof fetch, url: string, init: RequestI
 export function createProviderAdapter(connection: ModelConnection, fetcher: typeof fetch = fetch): SemanticAdapter {
   const baseUrl = trimSlash(connection.baseUrl);
   if (!baseUrl) throw new Error('The selected provider has no API base URL.');
+  if (connection.provider === 'nvidia') throw new Error('NVIDIA blocks direct browser requests. Connect a user-controlled relay through Custom instead.');
 
   if (connection.provider === 'gemini') {
     return {

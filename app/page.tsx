@@ -117,6 +117,12 @@ function AiSetupModal({ activeConnection, onClose, onConnect, onDisconnect }: { 
             <div className="provider-copy"><span className="provider-mark">L</span><div><h3>Keep the whole book here.</h3><p>Use Leafmark’s current extractive reader. No account, key, or network request.</p></div></div>
             <button className="primary-button" type="button" onClick={useLocal}>Use local reading</button>
           </div>
+        ) : provider.id === 'nvidia' ? (
+          <div className="provider-workspace provider-limit">
+            <div className="provider-copy"><span className="provider-mark">N</span><div><h3>NVIDIA needs a route you control.</h3><p>NVIDIA&apos;s hosted NIM endpoint does not permit credentialed requests from GitHub Pages. Leafmark will not send your key through an unknown public CORS proxy.</p></div><a href={provider.keyUrl} target="_blank" rel="noreferrer">NVIDIA guide ↗</a></div>
+            <div className="provider-limit-note"><span aria-hidden="true">i</span><p>Run a local NIM or private relay with an OpenAI-compatible URL, then add that URL and its key under Custom.</p></div>
+            <button className="primary-button" type="button" onClick={() => selectProvider('custom')}>Set up my endpoint</button>
+          </div>
         ) : (
           <div className="provider-workspace">
             <div className="provider-copy"><span className="provider-mark">{provider.mark}</span><div><h3>{provider.name}</h3><p>{provider.description}</p></div>{provider.keyUrl && <a href={provider.keyUrl} target="_blank" rel="noreferrer">Get a key ↗</a>}</div>

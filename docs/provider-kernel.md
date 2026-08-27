@@ -92,10 +92,12 @@ One developer's key is used only for that developer's test. Every Leafmark reade
 ## Initial adapters
 
 1. Gemini native API.
-2. Generic OpenAI-compatible endpoint for Groq, Cerebras, NVIDIA, OpenAI, OpenRouter, Ollama, and similar services when their endpoints permit browser access.
+2. Generic OpenAI-compatible endpoint for Groq, Cerebras, OpenAI, OpenRouter, Ollama, and similar services when their endpoints permit browser access.
 3. Provider-specific overrides only where model discovery, authentication, or structured output differs.
 4. WebLLM as a keyless on-device adapter.
 5. Existing extractive processor as the universal offline fallback.
+
+NVIDIA's hosted API currently does not grant the credentialed browser CORS access required by a GitHub Pages app. Leafmark therefore refuses to accept a hosted NVIDIA key directly and supports NVIDIA through a user-controlled OpenAI-compatible relay or local NIM endpoint configured under Custom. Public third-party CORS proxies are not acceptable for credentials or book excerpts.
 
 ## Implemented browser kernel
 
