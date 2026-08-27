@@ -9,7 +9,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next dev",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "test": "tsx --test tests/*.test.ts"
   },
   "dependencies": {
     "jszip": "^3.10.1",
@@ -26,6 +27,7 @@
     "eslint": "9.39.4",
     "eslint-config-next": "16.3.3",
     "tailwindcss": "4.2.1",
+    "tsx": "^4.23.12",
     "typescript": "5.9.3"
   },
   "type": "module"

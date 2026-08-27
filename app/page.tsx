@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { ChangeEvent, DragEvent, useEffect, useRef, useState } from 'react';
+import { ChangeEvent, DragEvent, useRef, useState } from 'react';
 import { BookGuide, processBook, SummaryItem } from '../lib/book-processor';
 import { discoverModels, ModelConnection, ModelOption, ProviderId, providers, verifyCustomModel } from '../lib/model-providers';
+import type { SemanticProgress } from '../lib/semantic-kernel';
 
 const summaryModes = [
   { name: 'Snapshot', time: '2 min', description: 'The book in one clear page' },
@@ -58,17 +59,18 @@ function AiSetupModal({ activeConnection, onClose, onConnect, onDisconnect }: { 
   const [message, setMessage] = useState(activeConnection ? `${activeConnection.providerName} is connected for this tab.` : '');
   const [showKey, setShowKey] = useState(false);
 
-  useEffect(() => {
-    const next = providers.find((item) => item.id === providerId)!;
-    const matchesActive = activeConnection?.provider === providerId;
-    setApiKey(matchesActive ? activeConnection.apiKey : '');
-    setBaseUrl(matchesActive ? activeConnection.baseUrl : next.baseUrl);
-    setModels(matchesActive ? [{ id: activeConnection.model, label: activeConnection.model }] : []);
-    setModel(matchesActive ? activeConnection.model : '');
+  const selectProvider = (nextId: ProviderId) => {
+    const next = providers.find((item) => item.id === nextId)!;
+    const active = activeConnection?.provider === nextId ? activeConnection : null;
+    setProviderId(nextId);
+    setApiKey(active?.apiKey ?? '');
+    setBaseUrl(active?.baseUrl ?? next.baseUrl);
+    setModels(active ? [{ id: active.model, label: active.model }] : []);
+    setModel(active?.model ?? '');
     setConsent(false);
-    setStatus(matchesActive ? 'ready' : 'idle');
-    setMessage(matchesActive ? `${activeConnection.providerName} is connected for this tab.` : '');
-  }, [providerId, activeConnection]);
+    setStatus(active ? 'ready' : 'idle');
+    setMessage(active ? `${active.providerName} is connected for this tab.` : '');
+  };
 
   const testConnection = async () => {
     setStatus('testing'); setMessage('Checking the key and finding available models…');
@@ -104,7 +106,7 @@ function AiSetupModal({ activeConnection, onClose, onConnect, onDisconnect }: { 
 
         <div className="provider-tabs" role="tablist" aria-label="AI providers">
           {providers.map((item) => (
-            <button key={item.id} type="button" role="tab" aria-selected={providerId === item.id} className={providerId === item.id ? 'selected' : ''} onClick={() => setProviderId(item.id)}>
+            <button key={item.id} type="button" role="tab" aria-selected={providerId === item.id} className={providerId === item.id ? 'selected' : ''} onClick={() => selectProvider(item.id)}>
               <span>{item.mark}</span><b>{item.name}</b>
             </button>
           ))}
@@ -137,7 +139,7 @@ function AiSetupModal({ activeConnection, onClose, onConnect, onDisconnect }: { 
             </div>
           </div>
         )}
-        <p className="ai-footnote"><b>Current release:</b> connection setup is ready; book guides still use the local extractor until the semantic provider kernel is enabled.</p>
+        <p className="ai-footnote"><b>How it works:</b> Leafmark extracts the book locally, sends bounded excerpts to your selected model, validates a source ledger, then assembles every reading depth on this device.</p>
       </section>
     </div>
   );
@@ -150,11 +152,11 @@ function AboutModal({ onClose }: { onClose: () => void }) {
         <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
         <p className="eyebrow">No hidden meter</p>
         <h2 id="about-title">The book stays with you.</h2>
-        <p>Leafmark extracts selectable text inside your browser and creates a private, extractive reading guide. Nothing is sent to a book library or AI API.</p>
+        <p>Leafmark extracts selectable text inside your browser. Local reading stays entirely on this device; if you connect AI, bounded excerpts go directly to the provider you chose and nowhere else.</p>
         <ol>
           <li><b>Choose</b><span>Bring a PDF or EPUB you have the right to use.</span></li>
-          <li><b>Read locally</b><span>The browser identifies sections and useful sentences.</span></li>
-          <li><b>Explore</b><span>Switch between four depths and export your notes.</span></li>
+          <li><b>Choose the brain</b><span>Stay local or explicitly connect your own AI provider and key.</span></li>
+          <li><b>Explore</b><span>Leafmark validates source IDs, builds four depths, and exports your notes.</span></li>
         </ol>
       </section>
     </div>
@@ -274,6 +276,7 @@ export default function Home() {
   const [showAbout, setShowAbout] = useState(false);
   const [showAiSetup, setShowAiSetup] = useState(false);
   const [aiConnection, setAiConnection] = useState<ModelConnection | null>(null);
+  const [processingProgress, setProcessingProgress] = useState<SemanticProgress | null>(null);
 
   const chooseFile = (next?: File) => {
     if (!next) return;
@@ -298,8 +301,9 @@ export default function Home() {
     if (!file) { inputRef.current?.click(); return; }
     setStatus('processing');
     setError('');
+    setProcessingProgress({ phase: 'extracting', completed: 0, total: 1, message: 'Opening the book locally' });
     try {
-      const result = await processBook(file);
+      const result = await processBook(file, { connection: aiConnection, onProgress: setProcessingProgress });
       setGuide(result);
       setStatus('ready');
     } catch (caught) {
@@ -309,7 +313,7 @@ export default function Home() {
   };
 
   const reset = () => {
-    setGuide(null); setFile(null); setStatus('idle'); setError('');
+    setGuide(null); setFile(null); setStatus('idle'); setError(''); setProcessingProgress(null);
     if (inputRef.current) inputRef.current.value = '';
   };
 
@@ -342,8 +346,8 @@ export default function Home() {
             <div className="drop-copy"><strong>{file?.name || 'Bring your own book'}</strong><p>{file ? 'Ready to build your private reading guide.' : 'Drag in a PDF or EPUB, or choose a file from your device.'}</p></div>
             <button className="primary-button" type="button" onClick={buildGuide} disabled={status === 'processing'}>{status === 'processing' ? 'Reading…' : file ? `Build ${summaryModes[mode].name}` : 'Choose a book'}</button>
           </div>
-          {status === 'processing' && <div className="processing-bar" role="status"><span /><p><b>Reading your book locally…</b> Extracting sections and tracing every insight back to its source.</p></div>}
-          {status === 'error' && <div className="error-message" role="alert"><b>Couldn’t read this file.</b><span>{error}</span><button type="button" onClick={() => inputRef.current?.click()}>Choose another</button></div>}
+          {status === 'processing' && <div className="processing-bar" role="status"><span /><p><b>{aiConnection ? `Building with ${aiConnection.providerName}…` : 'Reading your book locally…'}</b> {processingProgress?.message || 'Tracing every insight back to its source.'}{processingProgress && processingProgress.total > 1 ? ` · ${Math.min(processingProgress.completed + 1, processingProgress.total)} of ${processingProgress.total}` : ''}</p></div>}
+          {status === 'error' && <div className="error-message" role="alert"><b>Couldn’t build this guide.</b><span>{error}</span><button type="button" onClick={buildGuide}>Try again</button></div>}
           <div className="trust-row" aria-label="Product promises"><span><b>01</b> No account needed</span><span><b>02</b> Page-linked insights</span><span><b>03</b> Export your notes</span></div>
         </section>
 
