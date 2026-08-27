@@ -187,7 +187,7 @@ function createGuide(file: File, title: string | undefined, segments: SourceSegm
     source: segment.source,
   }));
 
-  const chapterTargetWords = depthWordTarget(wordCount, .35, 60, 180);
+  const chapterTargetWords = depthWordTarget(wordCount, .55, 60, 180);
   const deepDiveTargetWords = depthWordTarget(wordCount, .72, 180, 300);
 
   const chapters = segments.map((segment) => {
