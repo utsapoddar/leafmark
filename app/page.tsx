@@ -6,8 +6,8 @@ import { BookGuide, processBook, SummaryItem } from '../lib/book-processor';
 const summaryModes = [
   { name: 'Snapshot', time: '2 min', description: 'The book in one clear page' },
   { name: 'Key ideas', time: '8 min', description: 'The arguments worth remembering' },
-  { name: 'Chapter guide', time: '≈55% of book', description: 'Every chapter, with arguments, examples, and context' },
-  { name: 'Deep dive', time: '≈80% of book', description: 'The fullest guide: substance preserved, repetition removed' },
+  { name: 'Chapter guide', time: '1–3 hr', description: 'Every chapter, with arguments, examples, and context' },
+  { name: 'Deep dive', time: '3–5 hr', description: 'The fullest guide: substance preserved, repetition removed' },
 ];
 
 const formatDuration = (minutes: number) => {
