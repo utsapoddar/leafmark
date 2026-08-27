@@ -150,3 +150,10 @@ test('Gemini adapter uses native generateContent and x-goog-api-key', async () =
   assert.equal(body.generationConfig.responseMimeType, 'application/json');
   assert.equal(body.contents[0].parts[0].text, 'Prompt');
 });
+
+test('hosted NVIDIA is rejected before a browser can expose a key to a broken CORS path', () => {
+  assert.throws(
+    () => createProviderAdapter({ ...connection, provider: 'nvidia', providerName: 'NVIDIA', baseUrl: 'https://integrate.api.nvidia.com/v1' }),
+    /blocks direct browser requests/,
+  );
+});
