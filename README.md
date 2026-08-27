@@ -8,14 +8,14 @@ Public site: https://utsapoddar.github.io/leafmark/
 
 - **Snapshot:** a two-minute overview of the whole book.
 - **Key ideas:** the arguments and claims worth retaining.
-- **Chapter guide:** a detailed, sequential companion targeting at least 55% of the uploaded book where that fits within the 1–3 hour reading range.
-- **Deep dive:** the fullest source-grounded guide, targeting 80% of the uploaded book where that fits within the 3–5 hour reading range.
+- **Chapter guide:** a detailed, sequential companion targeting roughly 55% of the uploaded book.
+- **Deep dive:** the fullest source-grounded guide, targeting roughly 80% while preserving substantive material and removing repetition, transitions, and other nonessential prose.
 - **Source trail:** each item retains a page or EPUB-section reference.
 - **Export:** the generated reading guide can be downloaded as Markdown.
 
 The initial engine is deliberately extractive. It ranks and assembles sentences from the source locally, which makes it free, fast, private, and less prone to invented claims. It does not yet OCR scanned/image-only PDFs.
 
-For unusually short books, a guide never claims to be longer than its source. For long books, Chapter Guide is capped at about three hours and Deep Dive at about five. The result screen reports the actual estimated reading time generated from the uploaded text.
+Reading times are estimates, not limits. A short story can produce a guide under an hour; an unusually long work can produce one well beyond five hours. Depth is determined by the share of substantive source material retained, and the result screen reports the actual estimated reading time generated from the uploaded text.
 
 ## Why this shape
 
