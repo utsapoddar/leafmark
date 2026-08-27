@@ -13,6 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://utsapoddar.github.io/leafmark/'),
   title: 'Leafmark — Understand any book at your depth',
   description: 'Private, local-first book summaries from your own PDF or EPUB. No subscription required.',
   openGraph: {

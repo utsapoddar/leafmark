@@ -2,6 +2,8 @@
 
 Leafmark is a free, privacy-first book-summary web app. A reader brings a PDF or EPUB they have the right to use; the browser extracts its selectable text and builds four views without sending the book to a server.
 
+Public site: https://utsapoddar.github.io/leafmark/
+
 ## Product model
 
 - **Snapshot:** a two-minute overview of the whole book.
@@ -31,6 +33,7 @@ Future improvements should preserve the same boundary:
 2. Add an optional on-device language model for abstractive summaries on capable hardware.
 3. Add a question mode whose answers always cite extracted sections.
 4. Store a local library in IndexedDB, with explicit delete controls.
+5. Add [Lecture Mode](docs/lecture-mode.md): a source-grounded teaching sequence that explains one idea at a time, checks recall, adapts the next explanation, and never advances silently past a misunderstanding.
 
 Do not build a public repository of user-generated summaries for copyrighted books without a separate rights and legal review. Keep uploads and generated guides private by default.
 
