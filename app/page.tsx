@@ -217,8 +217,10 @@ function GuideView({ guide, mode, setMode, onReset }: { guide: BookGuide; mode: 
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.download = `${guide.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-leafmark.md`;
+    document.body.append(anchor);
     anchor.click();
-    URL.revokeObjectURL(url);
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
   };
 
   return (
@@ -226,7 +228,7 @@ function GuideView({ guide, mode, setMode, onReset }: { guide: BookGuide; mode: 
       <aside className="guide-sidebar">
         <div>
           <p className="rail-label">This book</p>
-          <div className="mini-book"><span>PDF</span><div><b>{guide.title}</b><small>{guide.fileName}</small></div></div>
+          <div className="mini-book"><span>{guide.fileName.toLowerCase().endsWith('.epub') ? 'EPUB' : 'PDF'}</span><div><b>{guide.title}</b><small>{guide.fileName}</small></div></div>
           <nav className="guide-nav" aria-label="Summary views">
             {guideModes.map((item, index) => (
               <button className={mode === index ? 'active' : ''} onClick={() => setMode(index)} key={item.name} type="button">

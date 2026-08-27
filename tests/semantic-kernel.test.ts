@@ -35,7 +35,7 @@ const fakeAdapter: SemanticAdapter = {
       const ids = [...request.prompt.matchAll(/\[(S\d{6}) \|/g)].map((match) => match[1]);
       return JSON.stringify({
         summary: 'This excerpt develops connected principles through concrete evidence, qualifications, and practical detail.',
-        sentenceScores: ids.map((id, index) => ({ id, importance: index % 5 })),
+        scores: Object.fromEntries(ids.map((id, index) => [id, index % 5])),
         insights: [{
           title: 'Evidence changes the practical lesson',
           explanation: 'The excerpt connects its principle to evidence and preserves the qualification that limits the conclusion.',
@@ -72,6 +72,13 @@ test('stable sentence IDs and chunks preserve source order', () => {
   assert.deepEqual(chunks.flat().map((sentence) => sentence.id), sentences.map((sentence) => sentence.id));
 });
 
+test('default chunks stay within a compact provider-friendly sentence budget', () => {
+  const sentences = createSourceSentences([{ title: 'One', source: 'p. 1', text: makeBookText(190) }]);
+  const chunks = chunkSourceSentences(sentences);
+  assert.ok(chunks.length > 2);
+  assert.ok(chunks.every((chunk) => chunk.length <= 80));
+});
+
 test('semantic guide validates a ledger and assembles all four depths', async () => {
   clearSemanticCheckpoints();
   const segments = [
@@ -95,6 +102,33 @@ test('semantic guide validates a ledger and assembles all four depths', async ()
   assert.ok(deepWords / originalWords >= 0.78 && deepWords / originalWords <= 0.84);
   assert.ok(deepWords > chapterWords);
   assert.ok(progress.includes('analyzing') && progress.includes('synthesizing') && progress.includes('assembling'));
+});
+
+test('weak models can fall back from grounded chunk summaries without empty guides', async () => {
+  clearSemanticCheckpoints();
+  const summaryOnlyAdapter: SemanticAdapter = {
+    async complete(request) {
+      if (request.prompt.includes('LEAFMARK_TASK: LEDGER_CHUNK')) {
+        return JSON.stringify({
+          summary: 'The excerpt develops its events in sequence and preserves the concrete evidence that explains the result.',
+          essentialIds: [],
+          importantIds: [],
+          insights: [],
+        });
+      }
+      return JSON.stringify({ snapshot: 'A grounded snapshot assembled only from the supplied ledger.' });
+    },
+  };
+  const guide = await createSemanticGuide(
+    { title: 'Weak model fixture', fileName: 'weak.epub', segments: [{ title: 'Part', source: 'Section 1', text: makeBookText(100) }] },
+    connection,
+    undefined,
+    summaryOnlyAdapter,
+  );
+  assert.ok(guide.snapshot.includes('excerpt develops'));
+  assert.ok(guide.keyIdeas.length > 0);
+  assert.equal(guide.keyIdeas[0].source, 'Section 1');
+  assert.ok(guide.deepDiveMinutes > guide.chapterGuideMinutes);
 });
 
 test('successful ledger chunks resume from an in-memory checkpoint', async () => {
@@ -131,7 +165,20 @@ test('OpenAI-compatible adapter sends the common chat-completions request', asyn
   assert.equal((capturedInit?.headers as Record<string, string>).Authorization, 'Bearer test-key');
   assert.equal(body.model, 'reader-test');
   assert.equal(body.messages[1].content, 'Prompt');
+  assert.equal(body.chat_template_kwargs, undefined);
   assert.equal(result, '{"ok":true}');
+});
+
+test('Nemotron requests disable visible reasoning so structured output reaches the parser', async () => {
+  let capturedInit: RequestInit | undefined;
+  const fetcher: typeof fetch = async (_input, init) => {
+    capturedInit = init;
+    return new Response(JSON.stringify({ choices: [{ message: { content: '{"ok":true}' } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  const adapter = createProviderAdapter({ ...connection, model: 'nvidia/nemotron-3-nano-30b-a3b' }, fetcher);
+  await adapter.complete({ system: 'System', prompt: 'Prompt', maxOutputTokens: 500 });
+  const body = JSON.parse(String(capturedInit?.body));
+  assert.deepEqual(body.chat_template_kwargs, { enable_thinking: false });
 });
 
 test('Gemini adapter uses native generateContent and x-goog-api-key', async () => {
