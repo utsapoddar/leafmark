@@ -10,7 +10,10 @@
     "build": "next build",
     "start": "next dev",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "test": "tsx --test tests/*.test.ts"
+    "test": "tsx --test tests/*.test.ts",
+    "relay:dev": "npx wrangler@latest dev --config relay/wrangler.jsonc",
+    "relay:dry-run": "npx wrangler@latest deploy --config relay/wrangler.jsonc --dry-run",
+    "relay:deploy": "npx wrangler@latest deploy --config relay/wrangler.jsonc"
   },
   "dependencies": {
     "jszip": "^3.10.1",

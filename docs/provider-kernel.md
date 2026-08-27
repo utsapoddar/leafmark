@@ -59,7 +59,7 @@ The kernel owns token budgeting, chunking, retries, concurrency, structured-outp
 5. The reader selects a model and sees its known capabilities.
 6. Before processing begins, Leafmark states clearly that book excerpts will leave the device and names the destination provider.
 
-Keys are held in memory by default. Leafmark never places a key in source code, a URL, analytics, logs, exports, or GitHub. Persistent storage can only be an explicit reader choice and must explain that a browser cannot protect a long-lived key as strongly as a private server can.
+Keys are held in memory by default. Leafmark never places a key in source code, a URL, analytics, logs, exports, or GitHub. NVIDIA keys pass transiently through Leafmark's disclosed stateless relay because NVIDIA blocks credentialed browser requests; every other built-in provider remains direct where its CORS policy permits. Persistent storage can only be an explicit reader choice and must explain that a browser cannot protect a long-lived key as strongly as a private server can.
 
 ## Semantic processing pipeline
 
@@ -97,7 +97,7 @@ One developer's key is used only for that developer's test. Every Leafmark reade
 4. WebLLM as a keyless on-device adapter.
 5. Existing extractive processor as the universal offline fallback.
 
-NVIDIA's hosted API currently does not grant the credentialed browser CORS access required by a GitHub Pages app. Leafmark therefore refuses to accept a hosted NVIDIA key directly and supports NVIDIA through a user-controlled OpenAI-compatible relay or local NIM endpoint configured under Custom. Public third-party CORS proxies are not acceptable for credentials or book excerpts.
+NVIDIA's hosted API currently does not grant the credentialed browser CORS access required by a GitHub Pages app. When `NEXT_PUBLIC_LEAFMARK_NVIDIA_RELAY_URL` is configured, Leafmark exposes NVIDIA as a first-class provider through the repository's narrowly scoped stateless relay. That relay has no application key, storage, cache, analytics code, or general-purpose proxy route; it accepts only Leafmark origins and NVIDIA model-discovery/chat-completions requests. If no relay URL is configured, NVIDIA remains available through a user-controlled relay or local NIM endpoint under Custom.
 
 ## Implemented browser kernel
 

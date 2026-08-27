@@ -198,9 +198,13 @@ test('Gemini adapter uses native generateContent and x-goog-api-key', async () =
   assert.equal(body.contents[0].parts[0].text, 'Prompt');
 });
 
-test('hosted NVIDIA is rejected before a browser can expose a key to a broken CORS path', () => {
-  assert.throws(
-    () => createProviderAdapter({ ...connection, provider: 'nvidia', providerName: 'NVIDIA', baseUrl: 'https://integrate.api.nvidia.com/v1' }),
-    /blocks direct browser requests/,
-  );
+test('NVIDIA uses the configured relay through the common chat-completions adapter', async () => {
+  let capturedUrl = '';
+  const fetcher: typeof fetch = async (input) => {
+    capturedUrl = String(input);
+    return new Response(JSON.stringify({ choices: [{ message: { content: '{"ok":true}' } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  const adapter = createProviderAdapter({ ...connection, provider: 'nvidia', providerName: 'NVIDIA', baseUrl: 'https://relay.example/v1', model: 'nvidia/nemotron-test' }, fetcher);
+  await adapter.complete({ system: 'System', prompt: 'Prompt', maxOutputTokens: 500 });
+  assert.equal(capturedUrl, 'https://relay.example/v1/chat/completions');
 });
