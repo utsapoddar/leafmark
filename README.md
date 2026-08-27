@@ -9,7 +9,7 @@ Public site: https://utsapoddar.github.io/leafmark/
 - **Snapshot:** a two-minute overview of the whole book.
 - **Key ideas:** the arguments and claims worth retaining.
 - **Chapter guide:** a detailed, sequential companion targeting at least 55% of the uploaded book where that fits within the 1–3 hour reading range.
-- **Deep dive:** the fullest source-grounded guide, targeting 3–5 hours and roughly 72% of the uploaded book.
+- **Deep dive:** the fullest source-grounded guide, targeting 80% of the uploaded book where that fits within the 3–5 hour reading range.
 - **Source trail:** each item retains a page or EPUB-section reference.
 - **Export:** the generated reading guide can be downloaded as Markdown.
 
