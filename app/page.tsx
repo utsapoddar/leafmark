@@ -117,10 +117,10 @@ function AiSetupModal({ activeConnection, onClose, onConnect, onDisconnect }: { 
             <div className="provider-copy"><span className="provider-mark">L</span><div><h3>Keep the whole book here.</h3><p>Use Leafmark’s current extractive reader. No account, key, or network request.</p></div></div>
             <button className="primary-button" type="button" onClick={useLocal}>Use local reading</button>
           </div>
-        ) : provider.id === 'nvidia' ? (
+        ) : provider.id === 'nvidia' && !provider.baseUrl ? (
           <div className="provider-workspace provider-limit">
-            <div className="provider-copy"><span className="provider-mark">N</span><div><h3>NVIDIA needs a route you control.</h3><p>NVIDIA&apos;s hosted NIM endpoint does not permit credentialed requests from GitHub Pages. Leafmark will not send your key through an unknown public CORS proxy.</p></div><a href={provider.keyUrl} target="_blank" rel="noreferrer">NVIDIA guide ↗</a></div>
-            <div className="provider-limit-note"><span aria-hidden="true">i</span><p>Run a local NIM or private relay with an OpenAI-compatible URL, then add that URL and its key under Custom.</p></div>
+            <div className="provider-copy"><span className="provider-mark">N</span><div><h3>NVIDIA is available through Custom.</h3><p>The easy NVIDIA connection is not configured on this deployment. A local NIM or relay still works.</p></div><a href={provider.keyUrl} target="_blank" rel="noreferrer">Get a key ↗</a></div>
+            <div className="provider-limit-note"><span aria-hidden="true">i</span><p>Add your local NIM or private relay under Custom. Leafmark will never choose an unknown public proxy for you.</p></div>
             <button className="primary-button" type="button" onClick={() => selectProvider('custom')}>Set up my endpoint</button>
           </div>
         ) : (
@@ -128,16 +128,17 @@ function AiSetupModal({ activeConnection, onClose, onConnect, onDisconnect }: { 
             <div className="provider-copy"><span className="provider-mark">{provider.mark}</span><div><h3>{provider.name}</h3><p>{provider.description}</p></div>{provider.keyUrl && <a href={provider.keyUrl} target="_blank" rel="noreferrer">Get a key ↗</a>}</div>
 
             <div className="connection-form">
+              {provider.id === 'nvidia' && <div className="relay-route" aria-label="NVIDIA connection route"><span>Private route</span><strong>Leafmark relay <b aria-hidden="true">→</b> NVIDIA</strong><p>No storage, database, cache, or application key.</p></div>}
               {provider.id === 'custom' && <label><span>API base URL</span><input value={baseUrl} onChange={(event) => { setBaseUrl(event.target.value); setStatus('idle'); }} placeholder="https://your-provider.example/v1" /></label>}
               {provider.id === 'custom' && <label><span>Model ID</span><input value={model} onChange={(event) => { setModel(event.target.value); setStatus('idle'); }} placeholder="your-model-name" /></label>}
               <label><span>{provider.id === 'custom' ? 'Bearer key (optional)' : 'API key'}</span><div className="secret-field"><input type={showKey ? 'text' : 'password'} value={apiKey} onChange={(event) => { setApiKey(event.target.value); setStatus('idle'); }} placeholder={provider.keyPlaceholder} autoComplete="off" spellCheck={false} /><button type="button" onClick={() => setShowKey((value) => !value)}>{showKey ? 'Hide' : 'Show'}</button></div></label>
-              <p className="key-privacy">Leafmark does not store your API key or send it anywhere except the provider you choose. <Link href="/privacy/" target="_blank" rel="noreferrer">Read our Privacy Policy.</Link></p>
+              <p className="key-privacy">{provider.id === 'nvidia' ? 'Your key and excerpts pass temporarily through Leafmark’s stateless relay to NVIDIA. They are not stored.' : 'Leafmark does not store your API key or send it anywhere except the provider you choose.'} <Link href="/privacy/" target="_blank" rel="noreferrer">Read our Privacy Policy.</Link></p>
               {provider.id !== 'custom' && models.length > 0 && <label><span>Model</span><select value={model} onChange={(event) => setModel(event.target.value)}>{models.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>}
             </div>
 
             <div className={`connection-status ${status}`} role="status"><span>{status === 'testing' ? '↻' : status === 'ready' ? '✓' : status === 'error' ? '!' : 'i'}</span><p>{message || 'The key stays in memory and disappears when this tab closes.'}</p></div>
 
-            {status === 'ready' && <label className="consent-row"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} /><span>I understand that book excerpts will be sent to {provider.name} when AI reading is enabled.</span></label>}
+            {status === 'ready' && <label className="consent-row"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} /><span>I understand that book excerpts will {provider.id === 'nvidia' ? 'pass through Leafmark’s relay to NVIDIA' : `be sent to ${provider.name}`} when AI reading is enabled.</span></label>}
 
             <div className="ai-actions">
               <button className="test-button" type="button" onClick={testConnection} disabled={status === 'testing'}>{status === 'testing' ? 'Testing…' : models.length ? 'Test again' : 'Test & find models'}</button>
@@ -158,7 +159,7 @@ function AboutModal({ onClose }: { onClose: () => void }) {
         <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
         <p className="eyebrow">No hidden meter</p>
         <h2 id="about-title">The book stays with you.</h2>
-        <p>Leafmark extracts selectable text inside your browser. Local reading stays entirely on this device; if you connect AI, bounded excerpts go directly to the provider you chose and nowhere else.</p>
+        <p>Leafmark extracts selectable text inside your browser. Local reading stays entirely on this device; if you connect AI, bounded excerpts go to the provider you chose. NVIDIA requests pass through Leafmark&apos;s stateless relay because NVIDIA blocks direct browser access.</p>
         <ol>
           <li><b>Choose</b><span>Bring a PDF or EPUB you have the right to use.</span></li>
           <li><b>Choose the brain</b><span>Stay local or explicitly connect your own AI provider and key.</span></li>

@@ -27,7 +27,7 @@ Leafmark combines the useful interaction patterns—quick overview, idea cards, 
 
 ## Bring your own model
 
-The current release has no metered API and no app database. PDF parsing uses PDF.js, EPUB parsing uses JSZip and browser DOM APIs, and the current extractive engine runs on the reader's device. Static hosting can therefore stay within common free tiers.
+The current release has no metered model API and no app database. PDF parsing uses PDF.js, EPUB parsing uses JSZip and browser DOM APIs, and the extractive engine runs on the reader's device. Static hosting can therefore stay within common free tiers. NVIDIA is the sole CORS exception: its optional, stateless [privacy relay](relay/README.md) forwards each reader's own key and bounded excerpts without storing them.
 
 The implemented [provider kernel](docs/provider-kernel.md) lets each reader connect a free API key, paid API key, or self-hosted OpenAI-compatible endpoint. It extracts and labels source sentences locally, asks the selected model for a validated content ledger, synthesizes the short views, and assembles the long source-grounded views on the reader's device. Credentials belong to each reader and are never included in the public site.
 

@@ -29,6 +29,8 @@ jobs:
         run: npm ci
       - name: Build static site
         run: npm run build
+        env:
+          NEXT_PUBLIC_LEAFMARK_NVIDIA_RELAY_URL: ${{ vars.NVIDIA_RELAY_URL }}
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload static site

@@ -23,16 +23,17 @@ export type ModelConnection = {
   model: string;
 };
 
+const trimSlash = (value: string) => value.trim().replace(/\/+$/, '');
+export const nvidiaRelayUrl = trimSlash(process.env.NEXT_PUBLIC_LEAFMARK_NVIDIA_RELAY_URL ?? '');
+
 export const providers: ProviderDefinition[] = [
   { id: 'local', name: 'Local', mark: 'L', description: 'No key. Keep every page on this device.', baseUrl: '' },
   { id: 'gemini', name: 'Gemini', mark: 'G', description: 'Google AI Studio models and free or paid keys.', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', keyUrl: 'https://aistudio.google.com/app/apikey', keyPlaceholder: 'AIza…' },
   { id: 'groq', name: 'Groq', mark: 'Q', description: 'Fast hosted models through GroqCloud.', baseUrl: 'https://api.groq.com/openai/v1', keyUrl: 'https://console.groq.com/keys', keyPlaceholder: 'gsk_…' },
   { id: 'cerebras', name: 'Cerebras', mark: 'C', description: 'Fast inference with free and paid access.', baseUrl: 'https://api.cerebras.ai/v1', keyUrl: 'https://cloud.cerebras.ai/', keyPlaceholder: 'csk-…' },
-  { id: 'nvidia', name: 'NVIDIA', mark: 'N', description: 'Hosted NIM requires a user-controlled relay when Leafmark runs on GitHub Pages.', baseUrl: 'https://integrate.api.nvidia.com/v1', keyUrl: 'https://docs.api.nvidia.com/nim/docs/api-quickstart', keyPlaceholder: 'nvapi-…' },
+  { id: 'nvidia', name: 'NVIDIA', mark: 'N', description: 'Hosted NIM models through Leafmark’s stateless privacy relay.', baseUrl: nvidiaRelayUrl, keyUrl: 'https://build.nvidia.com/settings/api-keys', keyPlaceholder: 'nvapi-…' },
   { id: 'custom', name: 'Custom', mark: '+', description: 'Any browser-accessible OpenAI-compatible endpoint.', baseUrl: '', keyPlaceholder: 'Optional bearer key' },
 ];
-
-const trimSlash = (value: string) => value.trim().replace(/\/+$/, '');
 
 function validateCustomUrl(value: string) {
   const parsed = new URL(value);
@@ -44,11 +45,10 @@ function validateCustomUrl(value: string) {
 
 export async function discoverModels(connection: Omit<ModelConnection, 'model'>): Promise<ModelOption[]> {
   if (connection.provider === 'local') return [{ id: 'leafmark-extractive', label: 'Leafmark local extractor' }];
-  if (connection.provider === 'nvidia') throw new Error('NVIDIA blocks direct requests from GitHub Pages. Use Custom with a relay or local NIM endpoint you control.');
   if (!connection.apiKey.trim() && connection.provider !== 'custom') throw new Error('Enter an API key first.');
 
   const baseUrl = trimSlash(connection.baseUrl);
-  if (!baseUrl) throw new Error('Enter the API base URL.');
+  if (!baseUrl) throw new Error(connection.provider === 'nvidia' ? 'Leafmark’s NVIDIA relay is not configured yet. Use Custom with a local NIM or relay.' : 'Enter the API base URL.');
   if (connection.provider === 'custom') validateCustomUrl(baseUrl);
 
   const headers: Record<string, string> = { Accept: 'application/json' };
