@@ -167,9 +167,10 @@ async function extractEpub(file: File, onProgress?: (progress: SemanticProgress)
     if (!html) continue;
     const doc = parser.parseFromString(html, 'text/html');
     doc.querySelectorAll('script, style, nav, svg').forEach((node) => node.remove());
+    const heading = normalize(doc.querySelector('h1, h2, h3, title')?.textContent ?? '');
+    doc.querySelectorAll('br, p, div, li, blockquote, h1, h2, h3, h4, h5, h6, section, article, td, th').forEach((node) => node.append(' '));
     const text = normalize(doc.body?.textContent ?? '');
     if (text.length < 120) continue;
-    const heading = normalize(doc.querySelector('h1, h2, h3, title')?.textContent ?? '');
     const chapterNumber = segments.length + 1;
     segments.push({ title: heading || `Section ${chapterNumber}`, text, source: `Section ${chapterNumber}` });
   }

@@ -99,7 +99,13 @@ export async function verifyCustomModel(connection: ModelConnection): Promise<Mo
     response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ model: connection.model.trim(), messages: [{ role: 'user', content: 'Reply with OK.' }], max_tokens: 3, temperature: 0 }),
+      body: JSON.stringify({
+        model: connection.model.trim(),
+        messages: [{ role: 'user', content: 'Reply with OK.' }],
+        max_tokens: 16,
+        temperature: 0,
+        ...(/nemotron/i.test(connection.model) ? { chat_template_kwargs: { enable_thinking: false } } : {}),
+      }),
       signal: AbortSignal.timeout(20000),
     });
   } catch {
