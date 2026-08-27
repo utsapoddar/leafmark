@@ -1,7 +1,9 @@
 'use client';
 
-import { ChangeEvent, DragEvent, useRef, useState } from 'react';
+import Link from 'next/link';
+import { ChangeEvent, DragEvent, useEffect, useRef, useState } from 'react';
 import { BookGuide, processBook, SummaryItem } from '../lib/book-processor';
+import { discoverModels, ModelConnection, ModelOption, ProviderId, providers, verifyCustomModel } from '../lib/model-providers';
 
 const summaryModes = [
   { name: 'Snapshot', time: '2 min', description: 'The book in one clear page' },
@@ -18,6 +20,7 @@ const formatDuration = (minutes: number) => {
 };
 
 type Status = 'idle' | 'processing' | 'ready' | 'error';
+type ConnectionStatus = 'idle' | 'testing' | 'ready' | 'error';
 
 function Brand() {
   return (
@@ -25,6 +28,118 @@ function Brand() {
       <span className="brand-mark" aria-hidden="true">L</span>
       <span>Leafmark</span>
     </a>
+  );
+}
+
+function AppHeader({ connection, onAbout, onAi }: { connection: ModelConnection | null; onAbout: () => void; onAi: () => void }) {
+  return (
+    <header className="topbar">
+      <Brand />
+      <div className="privacy-note"><span className="privacy-dot" />Your book stays local until you use AI</div>
+      <div className="topbar-actions">
+        <button className={`ai-button ${connection ? 'connected' : ''}`} type="button" onClick={onAi}>
+          <span aria-hidden="true">{connection ? '●' : '✦'}</span>{connection ? `${connection.providerName} ready` : 'Connect AI'}
+        </button>
+        <button className="quiet-button" type="button" onClick={onAbout}>How it works</button>
+      </div>
+    </header>
+  );
+}
+
+function AiSetupModal({ activeConnection, onClose, onConnect, onDisconnect }: { activeConnection: ModelConnection | null; onClose: () => void; onConnect: (connection: ModelConnection) => void; onDisconnect: () => void }) {
+  const [providerId, setProviderId] = useState<ProviderId>(activeConnection?.provider ?? 'gemini');
+  const provider = providers.find((item) => item.id === providerId)!;
+  const [apiKey, setApiKey] = useState(activeConnection?.apiKey ?? '');
+  const [baseUrl, setBaseUrl] = useState(activeConnection?.baseUrl ?? provider.baseUrl);
+  const [models, setModels] = useState<ModelOption[]>(activeConnection ? [{ id: activeConnection.model, label: activeConnection.model }] : []);
+  const [model, setModel] = useState(activeConnection?.model ?? '');
+  const [consent, setConsent] = useState(false);
+  const [status, setStatus] = useState<ConnectionStatus>(activeConnection ? 'ready' : 'idle');
+  const [message, setMessage] = useState(activeConnection ? `${activeConnection.providerName} is connected for this tab.` : '');
+  const [showKey, setShowKey] = useState(false);
+
+  useEffect(() => {
+    const next = providers.find((item) => item.id === providerId)!;
+    const matchesActive = activeConnection?.provider === providerId;
+    setApiKey(matchesActive ? activeConnection.apiKey : '');
+    setBaseUrl(matchesActive ? activeConnection.baseUrl : next.baseUrl);
+    setModels(matchesActive ? [{ id: activeConnection.model, label: activeConnection.model }] : []);
+    setModel(matchesActive ? activeConnection.model : '');
+    setConsent(false);
+    setStatus(matchesActive ? 'ready' : 'idle');
+    setMessage(matchesActive ? `${activeConnection.providerName} is connected for this tab.` : '');
+  }, [providerId, activeConnection]);
+
+  const testConnection = async () => {
+    setStatus('testing'); setMessage('Checking the key and finding available models…');
+    try {
+      const found = provider.id === 'custom' && model.trim()
+        ? await verifyCustomModel({ provider: provider.id, providerName: provider.name, apiKey, baseUrl, model })
+        : await discoverModels({ provider: provider.id, providerName: provider.name, apiKey, baseUrl });
+      setModels(found); setModel((current) => current && found.some((item) => item.id === current) ? current : found[0].id);
+      setStatus('ready'); setMessage(`${found.length} model${found.length === 1 ? '' : 's'} available. Choose one to finish.`);
+    } catch (caught) {
+      setStatus('error'); setMessage(caught instanceof Error ? caught.message : 'The connection could not be tested.');
+    }
+  };
+
+  const useLocal = () => {
+    onDisconnect(); onClose();
+  };
+
+  const saveConnection = () => {
+    if (!model || !consent) return;
+    onConnect({ provider: provider.id, providerName: provider.name, apiKey: apiKey.trim(), baseUrl: baseUrl.trim(), model });
+    onClose();
+  };
+
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <section className="ai-modal" role="dialog" aria-modal="true" aria-labelledby="ai-title" onMouseDown={(event) => event.stopPropagation()}>
+        <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
+        <div className="ai-modal-heading">
+          <div><p className="eyebrow">Your model, your account</p><h2 id="ai-title">Connect a reading brain.</h2></div>
+          <p>Free key, paid key, or your own endpoint. Leafmark never includes your credential in the public site.</p>
+        </div>
+
+        <div className="provider-tabs" role="tablist" aria-label="AI providers">
+          {providers.map((item) => (
+            <button key={item.id} type="button" role="tab" aria-selected={providerId === item.id} className={providerId === item.id ? 'selected' : ''} onClick={() => setProviderId(item.id)}>
+              <span>{item.mark}</span><b>{item.name}</b>
+            </button>
+          ))}
+        </div>
+
+        {provider.id === 'local' ? (
+          <div className="provider-workspace local-choice">
+            <div className="provider-copy"><span className="provider-mark">L</span><div><h3>Keep the whole book here.</h3><p>Use Leafmark’s current extractive reader. No account, key, or network request.</p></div></div>
+            <button className="primary-button" type="button" onClick={useLocal}>Use local reading</button>
+          </div>
+        ) : (
+          <div className="provider-workspace">
+            <div className="provider-copy"><span className="provider-mark">{provider.mark}</span><div><h3>{provider.name}</h3><p>{provider.description}</p></div>{provider.keyUrl && <a href={provider.keyUrl} target="_blank" rel="noreferrer">Get a key ↗</a>}</div>
+
+            <div className="connection-form">
+              {provider.id === 'custom' && <label><span>API base URL</span><input value={baseUrl} onChange={(event) => { setBaseUrl(event.target.value); setStatus('idle'); }} placeholder="https://your-provider.example/v1" /></label>}
+              {provider.id === 'custom' && <label><span>Model ID</span><input value={model} onChange={(event) => { setModel(event.target.value); setStatus('idle'); }} placeholder="your-model-name" /></label>}
+              <label><span>{provider.id === 'custom' ? 'Bearer key (optional)' : 'API key'}</span><div className="secret-field"><input type={showKey ? 'text' : 'password'} value={apiKey} onChange={(event) => { setApiKey(event.target.value); setStatus('idle'); }} placeholder={provider.keyPlaceholder} autoComplete="off" spellCheck={false} /><button type="button" onClick={() => setShowKey((value) => !value)}>{showKey ? 'Hide' : 'Show'}</button></div></label>
+              <p className="key-privacy">Leafmark does not store your API key or send it anywhere except the provider you choose. <Link href="/privacy/" target="_blank" rel="noreferrer">Read our Privacy Policy.</Link></p>
+              {provider.id !== 'custom' && models.length > 0 && <label><span>Model</span><select value={model} onChange={(event) => setModel(event.target.value)}>{models.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>}
+            </div>
+
+            <div className={`connection-status ${status}`} role="status"><span>{status === 'testing' ? '↻' : status === 'ready' ? '✓' : status === 'error' ? '!' : 'i'}</span><p>{message || 'The key stays in memory and disappears when this tab closes.'}</p></div>
+
+            {status === 'ready' && <label className="consent-row"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} /><span>I understand that book excerpts will be sent to {provider.name} when AI reading is enabled.</span></label>}
+
+            <div className="ai-actions">
+              <button className="test-button" type="button" onClick={testConnection} disabled={status === 'testing'}>{status === 'testing' ? 'Testing…' : models.length ? 'Test again' : 'Test & find models'}</button>
+              <button className="primary-button" type="button" onClick={saveConnection} disabled={status !== 'ready' || !model || !consent}>Use this model</button>
+            </div>
+          </div>
+        )}
+        <p className="ai-footnote"><b>Current release:</b> connection setup is ready; book guides still use the local extractor until the semantic provider kernel is enabled.</p>
+      </section>
+    </div>
   );
 }
 
@@ -157,6 +272,8 @@ export default function Home() {
   const [guide, setGuide] = useState<BookGuide | null>(null);
   const [error, setError] = useState('');
   const [showAbout, setShowAbout] = useState(false);
+  const [showAiSetup, setShowAiSetup] = useState(false);
+  const [aiConnection, setAiConnection] = useState<ModelConnection | null>(null);
 
   const chooseFile = (next?: File) => {
     if (!next) return;
@@ -197,21 +314,17 @@ export default function Home() {
   };
 
   if (status === 'ready' && guide) {
-    return <main className="app-shell result-app"><header className="topbar"><Brand /><div className="privacy-note"><span className="privacy-dot" />Your books stay on this device</div><button className="quiet-button" type="button" onClick={() => setShowAbout(true)}>How it works</button></header><GuideView guide={guide} mode={mode} setMode={setMode} onReset={reset} />{showAbout && <AboutModal onClose={() => setShowAbout(false)} />}</main>;
+    return <main className="app-shell result-app"><AppHeader connection={aiConnection} onAbout={() => setShowAbout(true)} onAi={() => setShowAiSetup(true)} /><GuideView guide={guide} mode={mode} setMode={setMode} onReset={reset} />{showAbout && <AboutModal onClose={() => setShowAbout(false)} />}{showAiSetup && <AiSetupModal activeConnection={aiConnection} onClose={() => setShowAiSetup(false)} onConnect={setAiConnection} onDisconnect={() => setAiConnection(null)} />}</main>;
   }
 
   return (
     <main className="app-shell">
-      <header className="topbar">
-        <Brand />
-        <div className="privacy-note"><span className="privacy-dot" />Your books stay on this device</div>
-        <button className="quiet-button" type="button" onClick={() => setShowAbout(true)}>How it works</button>
-      </header>
+      <AppHeader connection={aiConnection} onAbout={() => setShowAbout(true)} onAi={() => setShowAiSetup(true)} />
 
       <div className="workspace">
         <aside className="sidebar">
           <div><p className="rail-label">Library</p><button className="rail-item active" type="button"><span aria-hidden="true">⌂</span> My books <b>0</b></button><button className="rail-item" type="button"><span aria-hidden="true">✦</span> Saved ideas</button></div>
-          <div className="local-card"><span className="local-icon" aria-hidden="true">◎</span><strong>Free means local</strong><p>The reading happens in your browser. No subscription, no upload vault.</p></div>
+          <button className={`model-card ${aiConnection ? 'connected' : ''}`} type="button" onClick={() => setShowAiSetup(true)}><span className="local-icon" aria-hidden="true">{aiConnection ? '✓' : '✦'}</span><strong>{aiConnection ? `${aiConnection.providerName} ready` : 'Bring your own AI'}</strong><p>{aiConnection ? `${aiConnection.model} is connected for this tab.` : 'Use your free, paid, local, or self-hosted model.'}</p><b>{aiConnection ? 'Change model →' : 'Connect a model →'}</b></button>
         </aside>
 
         <section className="main-stage">
@@ -238,6 +351,7 @@ export default function Home() {
       </div>
 
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
+      {showAiSetup && <AiSetupModal activeConnection={aiConnection} onClose={() => setShowAiSetup(false)} onConnect={setAiConnection} onDisconnect={() => setAiConnection(null)} />}
     </main>
   );
 }
