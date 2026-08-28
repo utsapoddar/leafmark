@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { ChangeEvent, DragEvent, useRef, useState } from 'react';
 import { BookGuide, processBook, SummaryItem } from '../lib/book-processor';
 import { discoverModels, ModelConnection, ModelOption, ProviderId, providers, verifyCustomModel } from '../lib/model-providers';
-import type { SemanticProgress } from '../lib/semantic-kernel';
+import type { SemanticExcerptProgress, SemanticProgress } from '../lib/semantic-kernel';
 
 const summaryModes = [
   { name: 'Snapshot', time: '2 min', description: 'The book in one clear page' },
@@ -22,6 +22,7 @@ const formatDuration = (minutes: number) => {
 
 type Status = 'idle' | 'processing' | 'ready' | 'error';
 type ConnectionStatus = 'idle' | 'testing' | 'ready' | 'error';
+type VisibleExcerptProgress = Omit<SemanticExcerptProgress, 'state'> & { state: SemanticExcerptProgress['state'] | 'failed' };
 
 function Brand() {
   return (
@@ -275,6 +276,45 @@ function GuideView({ guide, mode, setMode, onReset }: { guide: BookGuide; mode: 
   );
 }
 
+function LiveReadingLedger({ excerpts, error }: { excerpts: VisibleExcerptProgress[]; error?: string }) {
+  if (!excerpts.length) return null;
+  const savedStates = new Set<VisibleExcerptProgress['state']>(['saved', 'restored', 'recovered']);
+  const saved = excerpts.filter((excerpt) => savedStates.has(excerpt.state)).length;
+  const total = excerpts[0]?.total ?? 0;
+  const recent = excerpts.slice(-7).reverse();
+  const stateLabel = (state: VisibleExcerptProgress['state']) => ({
+    working: 'opening', streaming: 'writing', saved: 'saved', restored: 'restored', recovered: 'rescued', failed: 'stopped',
+  })[state];
+
+  return (
+    <section className="live-ledger" aria-label="Live excerpt progress">
+      <div className="live-ledger-heading">
+        <div><span>Live reading ledger</span><b>{saved} of {total} saved on this device</b></div>
+        <strong>{total ? Math.round((saved / total) * 100) : 0}%</strong>
+      </div>
+      <div className="ledger-track" aria-hidden="true"><span style={{ width: `${total ? (saved / total) * 100 : 0}%` }} /></div>
+      <div className="ledger-slip-stack">
+        {recent.map((excerpt) => (
+          <article className={`ledger-slip ${excerpt.state}`} key={excerpt.index}>
+            <span className="ledger-slip-number">{String(excerpt.index).padStart(3, '0')}</span>
+            <div>
+              <div className="ledger-slip-line"><b>{excerpt.source}</b><span>{stateLabel(excerpt.state)}</span></div>
+              <p>{excerpt.state === 'streaming'
+                ? `${(excerpt.receivedCharacters ?? 0).toLocaleString()} response characters received…`
+                : excerpt.state === 'working'
+                  ? 'Request sent. Waiting for the first streamed response…'
+                  : excerpt.state === 'failed'
+                    ? error || 'This excerpt stopped. Retry will begin here.'
+                    : excerpt.summary || 'Validated and checkpointed.'}</p>
+            </div>
+          </article>
+        ))}
+      </div>
+      <p className="ledger-footnote">Saved rows survive refreshes. Your API key does not—it remains only in memory.</p>
+    </section>
+  );
+}
+
 export default function Home() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState(1);
@@ -287,6 +327,7 @@ export default function Home() {
   const [showAiSetup, setShowAiSetup] = useState(false);
   const [aiConnection, setAiConnection] = useState<ModelConnection | null>(null);
   const [processingProgress, setProcessingProgress] = useState<SemanticProgress | null>(null);
+  const [excerptProgress, setExcerptProgress] = useState<VisibleExcerptProgress[]>([]);
 
   const chooseFile = (next?: File) => {
     if (!next) return;
@@ -296,6 +337,7 @@ export default function Home() {
       return;
     }
     setFile(next);
+    setExcerptProgress([]);
     setError('');
     setStatus('idle');
   };
@@ -311,19 +353,30 @@ export default function Home() {
     if (!file) { inputRef.current?.click(); return; }
     setStatus('processing');
     setError('');
+    if (status !== 'error') setExcerptProgress([]);
     setProcessingProgress({ phase: 'extracting', completed: 0, total: 1, message: 'Opening the book locally' });
     try {
-      const result = await processBook(file, { connection: aiConnection, onProgress: setProcessingProgress });
+      const result = await processBook(file, { connection: aiConnection, onProgress: (progress) => {
+        setProcessingProgress(progress);
+        if (!progress.excerpt) return;
+        setExcerptProgress((current) => {
+          const existing = current.find((excerpt) => excerpt.index === progress.excerpt!.index);
+          const next = existing ? { ...existing, ...progress.excerpt! } : progress.excerpt!;
+          return [...current.filter((excerpt) => excerpt.index !== next.index), next].sort((a, b) => a.index - b.index);
+        });
+      } });
       setGuide(result);
       setStatus('ready');
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'This book could not be read.');
+      const message = caught instanceof Error ? caught.message : 'This book could not be read.';
+      setError(message);
+      setExcerptProgress((current) => current.map((excerpt, index) => index === current.length - 1 && ['working', 'streaming'].includes(excerpt.state) ? { ...excerpt, state: 'failed' } : excerpt));
       setStatus('error');
     }
   };
 
   const reset = () => {
-    setGuide(null); setFile(null); setStatus('idle'); setError(''); setProcessingProgress(null);
+    setGuide(null); setFile(null); setStatus('idle'); setError(''); setProcessingProgress(null); setExcerptProgress([]);
     if (inputRef.current) inputRef.current.value = '';
   };
 
@@ -356,7 +409,8 @@ export default function Home() {
             <div className="drop-copy"><strong>{file?.name || 'Bring your own book'}</strong><p>{file ? 'Ready to build your private reading guide.' : 'Drag in a PDF or EPUB, or choose a file from your device.'}</p></div>
             <button className="primary-button" type="button" onClick={buildGuide} disabled={status === 'processing'}>{status === 'processing' ? 'Reading…' : file ? `Build ${summaryModes[mode].name}` : 'Choose a book'}</button>
           </div>
-          {status === 'processing' && <div className="processing-bar" role="status"><span /><p><b>{aiConnection ? `Building with ${aiConnection.providerName}…` : 'Reading your book locally…'}</b> {processingProgress?.message || 'Tracing every insight back to its source.'}{processingProgress && processingProgress.total > 1 ? ` · ${Math.min(processingProgress.completed + 1, processingProgress.total)} of ${processingProgress.total}` : ''}</p></div>}
+          {status === 'processing' && <div className="processing-bar" role="status"><span /><p><b>{aiConnection ? `Building with ${aiConnection.providerName}…` : 'Reading your book locally…'}</b> {processingProgress?.message || 'Tracing every insight back to its source.'}{processingProgress && processingProgress.total > 1 ? ` · ${Math.min(processingProgress.completed + (processingProgress.phase === 'extracting' ? 1 : 0), processingProgress.total)} of ${processingProgress.total}` : ''}</p></div>}
+          {(status === 'processing' || status === 'error') && <LiveReadingLedger excerpts={excerptProgress} error={status === 'error' ? error : undefined} />}
           {status === 'error' && <div className="error-message" role="alert"><b>Couldn’t build this guide.</b><span>{error}</span><button type="button" onClick={buildGuide}>Try again</button></div>}
           <div className="trust-row" aria-label="Product promises"><span><b>01</b> No account needed</span><span><b>02</b> Page-linked insights</span><span><b>03</b> Export your notes</span></div>
         </section>

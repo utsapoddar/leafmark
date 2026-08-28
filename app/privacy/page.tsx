@@ -22,11 +22,11 @@ export default function PrivacyPage() {
           <p className="eyebrow">Plain-language privacy</p>
           <h1>Your book is yours.<br /><em>Your key is yours.</em></h1>
           <p className="privacy-summary">Leafmark is a static, local-first reader. It has no Leafmark account system, database, advertising tracker, or server that stores your uploaded book or API key.</p>
-          <p className="privacy-effective">Effective August 28, 2026</p>
+          <p className="privacy-effective">Effective August 29, 2026</p>
         </header>
 
         <section className="privacy-callout" aria-label="Privacy at a glance">
-          <div><span>01</span><b>Books stay local</b><p>PDF and EPUB text is extracted in your browser in the current release.</p></div>
+          <div><span>01</span><b>Books stay local</b><p>PDF and EPUB text is extracted in your browser. Excerpt checkpoints are saved only in browser storage on this device.</p></div>
           <div><span>02</span><b>Keys stay temporary</b><p>Your key is held only in this tab&apos;s memory and disappears on refresh or close.</p></div>
           <div><span>03</span><b>You choose the provider</b><p>When enabled, Leafmark&apos;s built-in NVIDIA connection uses a disclosed, stateless relay because NVIDIA&apos;s API blocks browsers.</p></div>
         </section>
@@ -35,6 +35,7 @@ export default function PrivacyPage() {
           <section>
             <h2>1. What Leafmark processes</h2>
             <p>When you choose a PDF or EPUB, Leafmark reads its selectable text in your browser to make a reading guide. The file is not uploaded to a Leafmark server. You should only use books you are legally allowed to access and process.</p>
+            <p>As each AI excerpt finishes, Leafmark stores its validated summary ledger in this browser&apos;s IndexedDB storage. This allows a later retry or refresh to restore completed excerpts without sending them again. These checkpoints may contain short generated summaries and page references, but not your API key or the uploaded book file. Clearing this site&apos;s browser data removes them.</p>
           </section>
 
           <section>
