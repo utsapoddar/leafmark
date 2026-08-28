@@ -212,8 +212,23 @@ test('Kimi uses max_completion_tokens and disables thinking for structured summa
   assert.equal(capturedUrl, 'https://api.moonshot.ai/v1/chat/completions');
   assert.equal(body.max_tokens, undefined);
   assert.equal(body.max_completion_tokens, 500);
+  assert.equal(body.temperature, undefined);
   assert.deepEqual(body.thinking, { type: 'disabled' });
   assert.deepEqual(body.response_format, { type: 'json_object' });
+});
+
+test('Kimi sends no thinking override to Moonshot V1 models', async () => {
+  let capturedInit: RequestInit | undefined;
+  const fetcher: typeof fetch = async (_input, init) => {
+    capturedInit = init;
+    return new Response(JSON.stringify({ choices: [{ message: { content: '{"ok":true}' } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  const adapter = createProviderAdapter({ ...connection, provider: 'kimi', providerName: 'Kimi', baseUrl: 'https://api.moonshot.ai/v1', model: 'moonshot-v1-128k' }, fetcher);
+  await adapter.complete({ system: 'System', prompt: 'Prompt', maxOutputTokens: 500 });
+  const body = JSON.parse(String(capturedInit?.body));
+  assert.equal(body.max_completion_tokens, 500);
+  assert.equal(body.temperature, 0.1);
+  assert.equal(body.thinking, undefined);
 });
 
 test('NVIDIA uses the configured relay through the common chat-completions adapter', async () => {
