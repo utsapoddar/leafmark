@@ -203,6 +203,8 @@ a { color: inherit; text-decoration: none; }
 .provider-limit-note { display: grid; grid-template-columns: 24px 1fr; gap: 9px; align-items: center; padding: 11px 12px; border-radius: 8px; background: #fff4dd; color: #725f38; }
 .provider-limit-note span { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 50%; background: #f5d99c; font-size: 10px; font-weight: 850; }
 .provider-limit-note p { margin: 0; font-size: 10px; line-height: 1.5; }
+.kimi-region-note { grid-column: 1 / -1; background: #edf0ff; color: #586482; }
+.kimi-region-note span { background: #dce2ff; color: var(--cobalt-dark); }
 .provider-limit .primary-button { width: auto; }
 .ai-footnote { margin: 13px 3px 0; color: #7e8798; font-size: 9px; line-height: 1.5; }
 .ai-footnote b { color: #5d687c; }

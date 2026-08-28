@@ -6,7 +6,7 @@ const kimiConnection: Omit<ModelConnection, 'model'> = {
   provider: 'kimi',
   providerName: 'Kimi',
   apiKey: 'sk-test',
-  baseUrl: 'https://api.moonshot.cn/v1',
+  baseUrl: 'https://api.moonshot.ai/v1',
 };
 
 test('Kimi model discovery uses the official endpoint and bearer key', async () => {
@@ -18,14 +18,14 @@ test('Kimi model discovery uses the official endpoint and bearer key', async () 
     return new Response(JSON.stringify({ data: [{ id: 'kimi-k2.6' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   };
   const models = await discoverModels(kimiConnection, fetcher);
-  assert.equal(capturedUrl, 'https://api.moonshot.cn/v1/models');
+  assert.equal(capturedUrl, 'https://api.moonshot.ai/v1/models');
   assert.equal((capturedHeaders as Record<string, string>).Authorization, 'Bearer sk-test');
   assert.deepEqual(models, [{ id: 'kimi-k2.6', label: 'kimi-k2.6' }]);
 });
 
 test('Kimi authentication errors identify the required key type', async () => {
   const fetcher: typeof fetch = async () => new Response('{}', { status: 401 });
-  await assert.rejects(discoverModels(kimiConnection, fetcher), /platform\.kimi\.com.*Kimi Code or membership key/);
+  await assert.rejects(discoverModels(kimiConnection, fetcher), /platform\.kimi\.ai.*platform\.kimi\.com/);
 });
 
 test('Kimi permission errors explain its separate API balance', async () => {

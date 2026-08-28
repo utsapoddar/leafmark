@@ -99,6 +99,8 @@ One developer's key is used only for that developer's test. Every Leafmark reade
 
 NVIDIA's hosted API currently does not grant the credentialed browser CORS access required by a GitHub Pages app. When `NEXT_PUBLIC_LEAFMARK_NVIDIA_RELAY_URL` is configured, Leafmark exposes NVIDIA as a first-class provider through the repository's narrowly scoped stateless relay. That relay has no application key, storage, cache, analytics code, or general-purpose proxy route; it accepts only Leafmark origins and NVIDIA model-discovery/chat-completions requests. If no relay URL is configured, NVIDIA remains available through a user-controlled relay or local NIM endpoint under Custom.
 
+The built-in Kimi connection targets the global `platform.kimi.ai` service at `https://api.moonshot.ai/v1`. Kimi's `platform.kimi.com` service uses separate keys and the `https://api.moonshot.cn/v1` endpoint; readers with those keys can connect it under Custom.
+
 ## Implemented browser kernel
 
 The current GitHub Pages release implements the first production slice of this design:
