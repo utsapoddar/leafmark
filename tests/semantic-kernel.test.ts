@@ -206,10 +206,10 @@ test('Kimi uses max_completion_tokens and disables thinking for structured summa
     capturedInit = init;
     return new Response(JSON.stringify({ choices: [{ message: { content: '{"ok":true}' } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   };
-  const adapter = createProviderAdapter({ ...connection, provider: 'kimi', providerName: 'Kimi', baseUrl: 'https://api.moonshot.cn/v1', model: 'kimi-k2.6' }, fetcher);
+  const adapter = createProviderAdapter({ ...connection, provider: 'kimi', providerName: 'Kimi', baseUrl: 'https://api.moonshot.ai/v1', model: 'kimi-k2.6' }, fetcher);
   await adapter.complete({ system: 'System', prompt: 'Prompt', maxOutputTokens: 500 });
   const body = JSON.parse(String(capturedInit?.body));
-  assert.equal(capturedUrl, 'https://api.moonshot.cn/v1/chat/completions');
+  assert.equal(capturedUrl, 'https://api.moonshot.ai/v1/chat/completions');
   assert.equal(body.max_tokens, undefined);
   assert.equal(body.max_completion_tokens, 500);
   assert.deepEqual(body.thinking, { type: 'disabled' });
