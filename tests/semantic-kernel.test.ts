@@ -231,6 +231,19 @@ test('Kimi sends no thinking override to Moonshot V1 models', async () => {
   assert.equal(body.thinking, undefined);
 });
 
+test('Kimi omits fixed temperature for K3 without sending a K2 thinking override', async () => {
+  let capturedInit: RequestInit | undefined;
+  const fetcher: typeof fetch = async (_input, init) => {
+    capturedInit = init;
+    return new Response(JSON.stringify({ choices: [{ message: { content: '{"ok":true}' } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  const adapter = createProviderAdapter({ ...connection, provider: 'kimi', providerName: 'Kimi', baseUrl: 'https://api.moonshot.ai/v1', model: 'kimi-k3' }, fetcher);
+  await adapter.complete({ system: 'System', prompt: 'Prompt', maxOutputTokens: 500 });
+  const body = JSON.parse(String(capturedInit?.body));
+  assert.equal(body.temperature, undefined);
+  assert.equal(body.thinking, undefined);
+});
+
 test('NVIDIA uses the configured relay through the common chat-completions adapter', async () => {
   let capturedUrl = '';
   const fetcher: typeof fetch = async (input) => {

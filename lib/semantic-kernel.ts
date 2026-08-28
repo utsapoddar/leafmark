@@ -194,8 +194,8 @@ export function createProviderAdapter(connection: ModelConnection, fetcher: type
       if (connection.provider === 'kimi') {
         delete body.max_tokens;
         body.max_completion_tokens = request.maxOutputTokens;
+        if (/^kimi-/i.test(connection.model)) delete body.temperature;
         if (/^kimi-k2\.(?:5|6)$/i.test(connection.model)) {
-          delete body.temperature;
           body.thinking = { type: 'disabled' };
         }
       }
