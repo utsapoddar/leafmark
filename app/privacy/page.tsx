@@ -67,7 +67,7 @@ export default function PrivacyPage() {
 
           <section>
             <h2>7. Provider policies</h2>
-            <p>Review the policy for the service you connect: <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer">Google</a>, <a href="https://groq.com/privacy-policy" target="_blank" rel="noreferrer">Groq</a>, <a href="https://www.cerebras.ai/privacy-policy" target="_blank" rel="noreferrer">Cerebras</a>, or <a href="https://www.nvidia.com/en-us/about-nvidia/privacy-center/" target="_blank" rel="noreferrer">NVIDIA</a>. For any other provider, use the policy published by that provider.</p>
+            <p>Review the policy for the service you connect: <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer">Google</a>, <a href="https://groq.com/privacy-policy" target="_blank" rel="noreferrer">Groq</a>, <a href="https://www.cerebras.ai/privacy-policy" target="_blank" rel="noreferrer">Cerebras</a>, <a href="https://www.kimi.com/user/agreement/userPrivacy?version=v2" target="_blank" rel="noreferrer">Kimi</a>, or <a href="https://www.nvidia.com/en-us/about-nvidia/privacy-center/" target="_blank" rel="noreferrer">NVIDIA</a>. For any other provider, use the policy published by that provider.</p>
           </section>
 
           <section>

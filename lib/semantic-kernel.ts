@@ -190,6 +190,11 @@ export function createProviderAdapter(connection: ModelConnection, fetcher: type
         max_tokens: request.maxOutputTokens,
         response_format: { type: 'json_object' },
       };
+      if (connection.provider === 'kimi') {
+        delete body.max_tokens;
+        body.max_completion_tokens = request.maxOutputTokens;
+        body.thinking = { type: 'disabled' };
+      }
       if (/nemotron/i.test(connection.model)) {
         body.chat_template_kwargs = { enable_thinking: false };
       }

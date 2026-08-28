@@ -198,6 +198,24 @@ test('Gemini adapter uses native generateContent and x-goog-api-key', async () =
   assert.equal(body.contents[0].parts[0].text, 'Prompt');
 });
 
+test('Kimi uses max_completion_tokens and disables thinking for structured summaries', async () => {
+  let capturedUrl = '';
+  let capturedInit: RequestInit | undefined;
+  const fetcher: typeof fetch = async (input, init) => {
+    capturedUrl = String(input);
+    capturedInit = init;
+    return new Response(JSON.stringify({ choices: [{ message: { content: '{"ok":true}' } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  const adapter = createProviderAdapter({ ...connection, provider: 'kimi', providerName: 'Kimi', baseUrl: 'https://api.moonshot.cn/v1', model: 'kimi-k2.6' }, fetcher);
+  await adapter.complete({ system: 'System', prompt: 'Prompt', maxOutputTokens: 500 });
+  const body = JSON.parse(String(capturedInit?.body));
+  assert.equal(capturedUrl, 'https://api.moonshot.cn/v1/chat/completions');
+  assert.equal(body.max_tokens, undefined);
+  assert.equal(body.max_completion_tokens, 500);
+  assert.deepEqual(body.thinking, { type: 'disabled' });
+  assert.deepEqual(body.response_format, { type: 'json_object' });
+});
+
 test('NVIDIA uses the configured relay through the common chat-completions adapter', async () => {
   let capturedUrl = '';
   const fetcher: typeof fetch = async (input) => {
