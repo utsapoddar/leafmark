@@ -149,7 +149,11 @@ async function fetchWithRetry(fetcher: typeof fetch, url: string, init: RequestI
     let response: Response;
     try {
       response = await fetcher(url, init);
-    } catch {
+    } catch (error) {
+      const errorName = error && typeof error === 'object' && 'name' in error ? String(error.name) : '';
+      if (errorName === 'TimeoutError' || errorName === 'AbortError') {
+        throw new Error('The provider took too long to finish this excerpt. Completed excerpts are still saved in this tab; try again or choose a faster model.');
+      }
       if (attempt === 2) throw new Error('The provider could not be reached from this browser. Check its CORS policy and your connection.');
       await delay(500 * (2 ** attempt));
       continue;
@@ -166,6 +170,7 @@ async function fetchWithRetry(fetcher: typeof fetch, url: string, init: RequestI
 export function createProviderAdapter(connection: ModelConnection, fetcher: typeof fetch = fetch): SemanticAdapter {
   const baseUrl = trimSlash(connection.baseUrl);
   if (!baseUrl) throw new Error('The selected provider has no API base URL.');
+  const completionTimeout = connection.provider === 'kimi' && /^kimi-k(?:2\.7|3)/i.test(connection.model) ? 300000 : 120000;
 
   if (connection.provider === 'gemini') {
     return {
@@ -178,7 +183,7 @@ export function createProviderAdapter(connection: ModelConnection, fetcher: type
             contents: [{ role: 'user', parts: [{ text: request.prompt }] }],
             generationConfig: { temperature: 0.1, maxOutputTokens: request.maxOutputTokens, responseMimeType: 'application/json' },
           }),
-          signal: AbortSignal.timeout(90000),
+          signal: AbortSignal.timeout(completionTimeout),
         });
         const payload = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> }; finishReason?: string }>; promptFeedback?: { blockReason?: string } };
         const text = payload.candidates?.[0]?.content?.parts?.map((part) => part.text ?? '').join('') ?? '';
@@ -217,12 +222,12 @@ export function createProviderAdapter(connection: ModelConnection, fetcher: type
       let response: Response;
       try {
         response = await fetchWithRetry(fetcher, `${baseUrl}/chat/completions`, {
-          method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(90000),
+          method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(completionTimeout),
         });
       } catch (error) {
         if (!(error instanceof Error) || !error.message.includes('(400)')) throw error;
         response = await fetchWithRetry(fetcher, `${baseUrl}/chat/completions`, {
-          method: 'POST', headers, body: JSON.stringify({ ...body, response_format: undefined }), signal: AbortSignal.timeout(90000),
+          method: 'POST', headers, body: JSON.stringify({ ...body, response_format: undefined }), signal: AbortSignal.timeout(completionTimeout),
         });
       }
 

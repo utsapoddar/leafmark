@@ -268,6 +268,20 @@ test('empty provider content is recovered locally without another paid request',
   assert.ok(messages.some((message) => message.includes('Recovered an empty provider result')));
 });
 
+test('provider timeouts are identified and are not automatically retried', async () => {
+  let calls = 0;
+  const fetcher: typeof fetch = async () => {
+    calls += 1;
+    throw new DOMException('The operation timed out.', 'TimeoutError');
+  };
+  const adapter = createProviderAdapter({ ...connection, provider: 'kimi', providerName: 'Kimi', baseUrl: 'https://api.moonshot.ai/v1', model: 'kimi-k3' }, fetcher);
+  await assert.rejects(
+    adapter.complete({ system: 'System', prompt: 'Prompt', maxOutputTokens: 500 }),
+    /took too long to finish this excerpt/,
+  );
+  assert.equal(calls, 1);
+});
+
 test('provider safety refusals are not converted into local guide output', async () => {
   clearSemanticCheckpoints();
   const fetcher: typeof fetch = async () => new Response(JSON.stringify({
