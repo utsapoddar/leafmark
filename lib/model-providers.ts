@@ -44,7 +44,7 @@ function validateCustomUrl(value: string) {
   }
 }
 
-export async function discoverModels(connection: Omit<ModelConnection, 'model'>): Promise<ModelOption[]> {
+export async function discoverModels(connection: Omit<ModelConnection, 'model'>, fetcher: typeof fetch = fetch): Promise<ModelOption[]> {
   if (connection.provider === 'local') return [{ id: 'leafmark-extractive', label: 'Leafmark local extractor' }];
   if (!connection.apiKey.trim() && connection.provider !== 'custom') throw new Error('Enter an API key first.');
 
@@ -58,13 +58,22 @@ export async function discoverModels(connection: Omit<ModelConnection, 'model'>)
 
   let response: Response;
   try {
-    response = await fetch(`${baseUrl}/models`, { headers, signal: AbortSignal.timeout(15000) });
+    response = await fetcher(`${baseUrl}/models`, { headers, signal: AbortSignal.timeout(15000) });
   } catch {
     throw new Error('The provider could not be reached from this browser. It may block direct browser connections.');
   }
 
   if (!response.ok) {
-    if (response.status === 401 || response.status === 403) throw new Error('The provider rejected this key. Check it or create a new one.');
+    if (response.status === 401) {
+      throw new Error(connection.provider === 'kimi'
+        ? 'Kimi could not authenticate this key. Use an sk- API key created at platform.kimi.com—not a Kimi Code or membership key.'
+        : 'The provider rejected this key. Check it or create a new one.');
+    }
+    if (response.status === 403) {
+      throw new Error(connection.provider === 'kimi'
+        ? 'Kimi denied API access. Its developer API balance is separate from Kimi membership and Kimi Code; check the balance at platform.kimi.com.'
+        : 'The provider denied access for this key. Check its balance and permissions.');
+    }
     if (response.status === 429) throw new Error('This key has reached its current rate limit.');
     throw new Error(`The provider returned ${response.status}. Check the endpoint and try again.`);
   }
