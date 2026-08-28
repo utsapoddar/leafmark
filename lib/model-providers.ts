@@ -92,7 +92,15 @@ export async function discoverModels(connection: Omit<ModelConnection, 'model'>,
   const nonChatModel = /(?:^|[-_/.])(whisper|embed(?:ding)?s?|tts|speech|transcri(?:be|ption)|rerank)(?:$|[-_/.])/i;
   const usable = models.filter((model) => model.id && !nonChatModel.test(model.id));
   if (!usable.length) throw new Error('The connection worked, but it returned no text-generation models.');
-  return usable.sort((a, b) => a.label.localeCompare(b.label));
+  const kimiOrder = ['kimi-k2.6', 'kimi-k2.5', 'kimi-k3'];
+  return usable.sort((a, b) => {
+    if (connection.provider === 'kimi') {
+      const aPriority = kimiOrder.indexOf(a.id);
+      const bPriority = kimiOrder.indexOf(b.id);
+      if (aPriority >= 0 || bPriority >= 0) return (aPriority < 0 ? kimiOrder.length : aPriority) - (bPriority < 0 ? kimiOrder.length : bPriority);
+    }
+    return a.label.localeCompare(b.label);
+  });
 }
 
 export async function verifyCustomModel(connection: ModelConnection): Promise<ModelOption[]> {

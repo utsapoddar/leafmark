@@ -15,12 +15,16 @@ test('Kimi model discovery uses the official endpoint and bearer key', async () 
   const fetcher: typeof fetch = async (input, init) => {
     capturedUrl = String(input);
     capturedHeaders = init?.headers;
-    return new Response(JSON.stringify({ data: [{ id: 'kimi-k2.6' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ data: [{ id: 'kimi-k2-thinking' }, { id: 'kimi-k3' }, { id: 'kimi-k2.6' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   };
   const models = await discoverModels(kimiConnection, fetcher);
   assert.equal(capturedUrl, 'https://api.moonshot.ai/v1/models');
   assert.equal((capturedHeaders as Record<string, string>).Authorization, 'Bearer sk-test');
-  assert.deepEqual(models, [{ id: 'kimi-k2.6', label: 'kimi-k2.6' }]);
+  assert.deepEqual(models, [
+    { id: 'kimi-k2.6', label: 'kimi-k2.6' },
+    { id: 'kimi-k3', label: 'kimi-k3' },
+    { id: 'kimi-k2-thinking', label: 'kimi-k2-thinking' },
+  ]);
 });
 
 test('Kimi authentication errors identify the required key type', async () => {
