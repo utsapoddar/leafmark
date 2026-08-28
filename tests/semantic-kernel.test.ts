@@ -244,6 +244,47 @@ test('Kimi omits fixed temperature for K3 without sending a K2 thinking override
   assert.equal(body.thinking, undefined);
 });
 
+test('empty provider content is recovered locally without another paid request', async () => {
+  clearSemanticCheckpoints();
+  let calls = 0;
+  const fetcher: typeof fetch = async () => {
+    calls += 1;
+    return new Response(JSON.stringify({
+      choices: [{ finish_reason: 'length', message: { content: '', reasoning_content: 'unfinished reasoning' } }],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  const adapter = createProviderAdapter({ ...connection, provider: 'kimi', providerName: 'Kimi', baseUrl: 'https://api.moonshot.ai/v1', model: 'kimi-k3' }, fetcher);
+  const messages: string[] = [];
+  const guide = await createSemanticGuide(
+    { title: 'Empty response fixture', fileName: 'empty.pdf', segments: [{ title: 'Part', source: 'pp. 1–8', text: makeBookText(70) }] },
+    { ...connection, provider: 'kimi', providerName: 'Kimi', model: 'kimi-k3' },
+    (event) => messages.push(event.message),
+    adapter,
+  );
+  const expectedLedgerCalls = chunkSourceSentences(createSourceSentences([{ title: 'Part', source: 'pp. 1–8', text: makeBookText(70) }])).length;
+  assert.equal(calls, expectedLedgerCalls + 1);
+  assert.ok(guide.snapshot.length > 60);
+  assert.ok(guide.keyIdeas.length > 0);
+  assert.ok(messages.some((message) => message.includes('Recovered an empty provider result')));
+});
+
+test('provider safety refusals are not converted into local guide output', async () => {
+  clearSemanticCheckpoints();
+  const fetcher: typeof fetch = async () => new Response(JSON.stringify({
+    choices: [{ finish_reason: 'stop', message: { content: '', refusal: 'Request declined' } }],
+  }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  const adapter = createProviderAdapter(connection, fetcher);
+  await assert.rejects(
+    createSemanticGuide(
+      { title: 'Refusal fixture', fileName: 'refusal.pdf', segments: [{ title: 'Part', source: 'Section 1', text: makeBookText(70) }] },
+      connection,
+      undefined,
+      adapter,
+    ),
+    /safety policy/,
+  );
+});
+
 test('NVIDIA uses the configured relay through the common chat-completions adapter', async () => {
   let capturedUrl = '';
   const fetcher: typeof fetch = async (input) => {

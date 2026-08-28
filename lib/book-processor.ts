@@ -104,15 +104,17 @@ const zipPath = (baseFile: string, relative: string) => {
   return resolved.join('/');
 };
 
-async function extractPdf(file: File, onProgress?: (progress: SemanticProgress) => void): Promise<{ title?: string; segments: SourceSegment[] }> {
-  const pdfjs = await import('pdfjs-dist');
-  pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
+async function extractPdf(file: File, onProgress?: (progress: SemanticProgress) => void, maxPages?: number): Promise<{ title?: string; segments: SourceSegment[] }> {
+  const runningInBrowser = typeof window !== 'undefined';
+  const pdfjs = runningInBrowser ? await import('pdfjs-dist') : await import('pdfjs-dist/legacy/build/pdf.mjs');
+  if (runningInBrowser) pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
   const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
   const metadata = await pdf.getMetadata().catch(() => null);
   const pages: SourceSegment[] = [];
+  const pageCount = maxPages ? Math.min(pdf.numPages, Math.max(1, Math.floor(maxPages))) : pdf.numPages;
 
-  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-    onProgress?.({ phase: 'extracting', completed: pageNumber - 1, total: pdf.numPages, message: `Reading page ${pageNumber} of ${pdf.numPages} locally` });
+  for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+    onProgress?.({ phase: 'extracting', completed: pageNumber - 1, total: pageCount, message: `Reading page ${pageNumber} of ${pageCount} locally` });
     const page = await pdf.getPage(pageNumber);
     const content = await page.getTextContent();
     const text = normalize(content.items.map((item) => ('str' in item ? item.str : '')).join(' '));
@@ -227,11 +229,12 @@ function createGuide(file: File, title: string | undefined, segments: SourceSegm
 export type ProcessBookOptions = {
   connection?: ModelConnection | null;
   onProgress?: (progress: SemanticProgress) => void;
+  maxPdfPages?: number;
 };
 
 export async function processBook(file: File, options: ProcessBookOptions = {}): Promise<BookGuide> {
   const extension = file.name.split('.').pop()?.toLowerCase();
-  const extracted = extension === 'epub' ? await extractEpub(file, options.onProgress) : await extractPdf(file, options.onProgress);
+  const extracted = extension === 'epub' ? await extractEpub(file, options.onProgress) : await extractPdf(file, options.onProgress, options.maxPdfPages);
   if (options.connection) {
     const { createSemanticGuide } = await import('./semantic-kernel');
     return createSemanticGuide({
