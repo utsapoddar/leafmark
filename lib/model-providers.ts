@@ -1,4 +1,4 @@
-export type ProviderId = 'local' | 'gemini' | 'groq' | 'cerebras' | 'nvidia' | 'custom';
+export type ProviderId = 'local' | 'gemini' | 'groq' | 'cerebras' | 'kimi' | 'nvidia' | 'custom';
 
 export type ProviderDefinition = {
   id: ProviderId;
@@ -31,6 +31,7 @@ export const providers: ProviderDefinition[] = [
   { id: 'gemini', name: 'Gemini', mark: 'G', description: 'Google AI Studio models and free or paid keys.', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', keyUrl: 'https://aistudio.google.com/app/apikey', keyPlaceholder: 'AIza…' },
   { id: 'groq', name: 'Groq', mark: 'Q', description: 'Fast hosted models through GroqCloud.', baseUrl: 'https://api.groq.com/openai/v1', keyUrl: 'https://console.groq.com/keys', keyPlaceholder: 'gsk_…' },
   { id: 'cerebras', name: 'Cerebras', mark: 'C', description: 'Fast inference with free and paid access.', baseUrl: 'https://api.cerebras.ai/v1', keyUrl: 'https://cloud.cerebras.ai/', keyPlaceholder: 'csk-…' },
+  { id: 'kimi', name: 'Kimi', mark: 'K', description: 'Long-context Kimi models through Moonshot’s direct API.', baseUrl: 'https://api.moonshot.cn/v1', keyUrl: 'https://platform.kimi.com/', keyPlaceholder: 'sk-…' },
   { id: 'nvidia', name: 'NVIDIA', mark: 'N', description: 'Hosted NIM models through Leafmark’s stateless privacy relay.', baseUrl: nvidiaRelayUrl, keyUrl: 'https://build.nvidia.com/settings/api-keys', keyPlaceholder: 'nvapi-…' },
   { id: 'custom', name: 'Custom', mark: '+', description: 'Any browser-accessible OpenAI-compatible endpoint.', baseUrl: '', keyPlaceholder: 'Optional bearer key' },
 ];

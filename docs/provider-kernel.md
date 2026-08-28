@@ -92,7 +92,7 @@ One developer's key is used only for that developer's test. Every Leafmark reade
 ## Initial adapters
 
 1. Gemini native API.
-2. Generic OpenAI-compatible endpoint for Groq, Cerebras, OpenAI, OpenRouter, Ollama, and similar services when their endpoints permit browser access.
+2. Direct OpenAI-compatible adapters for Groq, Cerebras, Kimi, and similar services whose endpoints permit browser access.
 3. Provider-specific overrides only where model discovery, authentication, or structured output differs.
 4. WebLLM as a keyless on-device adapter.
 5. Existing extractive processor as the universal offline fallback.
@@ -103,7 +103,7 @@ NVIDIA's hosted API currently does not grant the credentialed browser CORS acces
 
 The current GitHub Pages release implements the first production slice of this design:
 
-- native Gemini `generateContent` and generic OpenAI-compatible chat-completions adapters;
+- native Gemini `generateContent` and generic OpenAI-compatible chat-completions adapters, including Kimi's direct browser route;
 - conservative, source-labeled chunking that works without a provider-specific context database;
 - a validated ledger of sentence importance and source-grounded insights;
 - JSON repair, bounded transient-error retries, and actionable provider errors;
