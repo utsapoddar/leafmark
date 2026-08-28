@@ -125,7 +125,8 @@ function trimSlash(value: string) {
 }
 
 function responseError(status: number) {
-  if (status === 401 || status === 403) return new Error('The provider rejected this API key. Reconnect it and try again.');
+  if (status === 401) return new Error('The provider rejected this API key. Reconnect it and try again.');
+  if (status === 403) return new Error('The provider denied this request. Check the account balance and model permissions.');
   if (status === 404) return new Error('The selected model or completion endpoint was not found.');
   if (status === 408) return new Error('The provider took too long to answer. Try again.');
   if (status === 413) return new Error('The provider says this excerpt is too large for the selected model.');
