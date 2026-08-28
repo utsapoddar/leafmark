@@ -147,7 +147,7 @@ test('successful ledger chunks resume from an in-memory checkpoint', async () =>
   await createSemanticGuide(source, connection, (event) => messages.push(event.message), countingAdapter);
   assert.ok(firstPassCalls > 0);
   assert.equal(ledgerCalls, firstPassCalls);
-  assert.ok(messages.some((message) => message.includes('Resuming from the in-memory ledger')));
+  assert.ok(messages.some((message) => message.includes('Restored saved excerpt')));
 });
 
 test('OpenAI-compatible adapter sends the common chat-completions request', async () => {
@@ -201,20 +201,28 @@ test('Gemini adapter uses native generateContent and x-goog-api-key', async () =
 test('Kimi uses max_completion_tokens and disables thinking for structured summaries', async () => {
   let capturedUrl = '';
   let capturedInit: RequestInit | undefined;
+  const streamedLengths: number[] = [];
   const fetcher: typeof fetch = async (input, init) => {
     capturedUrl = String(input);
     capturedInit = init;
-    return new Response(JSON.stringify({ choices: [{ message: { content: '{"ok":true}' } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    return new Response([
+      'data: {"choices":[{"delta":{"content":"{\\"ok\\":"}}]}\n\n',
+      'data: {"choices":[{"delta":{"content":"true}"}}]}\n\n',
+      'data: [DONE]\n\n',
+    ].join(''), { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
   };
   const adapter = createProviderAdapter({ ...connection, provider: 'kimi', providerName: 'Kimi', baseUrl: 'https://api.moonshot.ai/v1', model: 'kimi-k2.6' }, fetcher);
-  await adapter.complete({ system: 'System', prompt: 'Prompt', maxOutputTokens: 500 });
+  const result = await adapter.complete({ system: 'System', prompt: 'Prompt', maxOutputTokens: 500, onDelta: (_delta, accumulated) => streamedLengths.push(accumulated.length) });
   const body = JSON.parse(String(capturedInit?.body));
   assert.equal(capturedUrl, 'https://api.moonshot.ai/v1/chat/completions');
   assert.equal(body.max_tokens, undefined);
   assert.equal(body.max_completion_tokens, 500);
   assert.equal(body.temperature, undefined);
+  assert.equal(body.stream, true);
   assert.deepEqual(body.thinking, { type: 'disabled' });
   assert.deepEqual(body.response_format, { type: 'json_object' });
+  assert.equal(result, '{"ok":true}');
+  assert.deepEqual(streamedLengths, [6, 11]);
 });
 
 test('Kimi sends no thinking override to Moonshot V1 models', async () => {
@@ -265,7 +273,7 @@ test('empty provider content is recovered locally without another paid request',
   assert.equal(calls, expectedLedgerCalls + 1);
   assert.ok(guide.snapshot.length > 60);
   assert.ok(guide.keyIdeas.length > 0);
-  assert.ok(messages.some((message) => message.includes('Recovered an empty provider result')));
+  assert.ok(messages.some((message) => message.includes('Recovered and saved excerpt')));
 });
 
 test('provider timeouts are identified and are not automatically retried', async () => {
@@ -280,6 +288,27 @@ test('provider timeouts are identified and are not automatically retried', async
     /took too long to finish this excerpt/,
   );
   assert.equal(calls, 1);
+});
+
+test('an excerpt rejected twice with 400 is rescued locally and the guide continues', async () => {
+  clearSemanticCheckpoints();
+  let calls = 0;
+  const fetcher: typeof fetch = async () => {
+    calls += 1;
+    return new Response(JSON.stringify({ error: { message: 'Excerpt rejected' } }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+  };
+  const adapter = createProviderAdapter({ ...connection, provider: 'kimi', providerName: 'Kimi', baseUrl: 'https://api.moonshot.ai/v1', model: 'kimi-k2.6' }, fetcher);
+  const states: string[] = [];
+  const guide = await createSemanticGuide(
+    { title: 'Rejected excerpt fixture', fileName: 'rejected.pdf', segments: [{ title: 'Part', source: 'pp. 1–8', text: makeBookText(70) }] },
+    { ...connection, provider: 'kimi', providerName: 'Kimi', model: 'kimi-k2.6' },
+    (event) => { if (event.excerpt) states.push(event.excerpt.state); },
+    adapter,
+  );
+  assert.ok(calls >= 4);
+  assert.ok(states.includes('recovered'));
+  assert.ok(guide.snapshot.length > 60);
+  assert.ok(guide.keyIdeas.length > 0);
 });
 
 test('provider safety refusals are not converted into local guide output', async () => {
