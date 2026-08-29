@@ -35,6 +35,10 @@ export interface SemanticAdapter {
   complete(request: CompletionRequest): Promise<string>;
 }
 
+export type SemanticGuideOptions = {
+  maxConcurrency?: number;
+};
+
 type SourceSentence = {
   id: string;
   text: string;
@@ -278,11 +282,32 @@ export function createProviderAdapter(connection: ModelConnection, fetcher: type
   const baseUrl = trimSlash(connection.baseUrl);
   if (!baseUrl) throw new Error('The selected provider has no API base URL.');
   const completionTimeout = connection.provider === 'kimi' && /^kimi-k(?:2\.7|3)/i.test(connection.model) ? 300000 : 120000;
+  let requestQueue = Promise.resolve();
+  let cooldownUntil = 0;
+  let minimumStartInterval = 0;
+  let nextRequestAt = 0;
+  const scheduledFetcher: typeof fetch = async (input, init) => {
+    const turn = requestQueue.then(async () => {
+      const wait = Math.max(0, cooldownUntil - Date.now(), nextRequestAt - Date.now());
+      if (wait) await delay(wait);
+      nextRequestAt = Date.now() + minimumStartInterval;
+    });
+    requestQueue = turn.catch(() => undefined);
+    await turn;
+    const response = await fetcher(input, { ...init, signal: AbortSignal.timeout(completionTimeout) });
+    if (response.status === 429) {
+      const retryAfter = Number(response.headers.get('retry-after'));
+      const cooldown = Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter * 1000, 120000) : 15000;
+      cooldownUntil = Math.max(cooldownUntil, Date.now() + cooldown);
+      minimumStartInterval = Math.max(minimumStartInterval, connection.provider === 'nvidia' ? 1800 : 750);
+    }
+    return response;
+  };
 
   if (connection.provider === 'gemini') {
     return {
       async complete(request) {
-        const response = await fetchWithRetry(fetcher, `${baseUrl}/models/${encodeURIComponent(connection.model)}:generateContent`, {
+        const response = await fetchWithRetry(scheduledFetcher, `${baseUrl}/models/${encodeURIComponent(connection.model)}:generateContent`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-goog-api-key': connection.apiKey },
           body: JSON.stringify({
@@ -330,13 +355,13 @@ export function createProviderAdapter(connection: ModelConnection, fetcher: type
 
       let response: Response;
       try {
-        response = await fetchWithRetry(fetcher, `${baseUrl}/chat/completions`, {
+        response = await fetchWithRetry(scheduledFetcher, `${baseUrl}/chat/completions`, {
           method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(completionTimeout),
         });
       } catch (error) {
         if (!(error instanceof Error) || !error.message.includes('(400)')) throw error;
         try {
-          response = await fetchWithRetry(fetcher, `${baseUrl}/chat/completions`, {
+          response = await fetchWithRetry(scheduledFetcher, `${baseUrl}/chat/completions`, {
             method: 'POST', headers, body: JSON.stringify({ ...body, response_format: undefined }), signal: AbortSignal.timeout(completionTimeout),
           });
         } catch (fallbackError) {
@@ -632,51 +657,75 @@ export async function createSemanticGuide(
   connection: ModelConnection,
   onProgress?: (progress: SemanticProgress) => void,
   adapter: SemanticAdapter = createProviderAdapter(connection),
+  options: SemanticGuideOptions = {},
 ): Promise<BookGuide> {
   const sentences = createSourceSentences(source.segments);
   const wordCount = source.segments.reduce((sum, segment) => sum + countWords(segment.text), 0);
   if (wordCount < 600) throw new Error('Not enough selectable text was found. This may be a scanned PDF; OCR support is planned next.');
   const chunks = chunkSourceSentences(sentences);
-  const ledgers: LedgerChunk[] = [];
+  const ledgers: LedgerChunk[] = new Array(chunks.length);
   const excerptSource = (chunk: SourceSentence[]) => {
     const first = chunk[0]?.source || 'Source excerpt';
     const last = chunk.at(-1)?.source || first;
     return first === last ? first : `${first} – ${last}`;
   };
 
-  for (let index = 0; index < chunks.length; index += 1) {
-    const key = checkpointKey(chunks[index]);
-    const sourceLabel = excerptSource(chunks[index]);
-    const checkpoint = await storedLedger(key);
-    if (checkpoint) {
-      onProgress?.({
-        phase: 'analyzing', completed: index + 1, total: chunks.length,
-        message: `Restored saved excerpt ${index + 1} of ${chunks.length}`,
-        excerpt: { index: index + 1, total: chunks.length, source: sourceLabel, state: 'restored', summary: checkpoint.summary },
-      });
-      ledgers.push(checkpoint);
-      continue;
+  const requestedConcurrency = Math.floor(options.maxConcurrency ?? 1);
+  const concurrency = Math.max(1, Math.min(24, requestedConcurrency, chunks.length));
+  let nextIndex = 0;
+  let completed = 0;
+  let firstError: unknown;
+  let stopScheduling = false;
+
+  const worker = async () => {
+    while (!stopScheduling) {
+      const index = nextIndex;
+      nextIndex += 1;
+      if (index >= chunks.length) return;
+      const key = checkpointKey(chunks[index]);
+      const sourceLabel = excerptSource(chunks[index]);
+      try {
+        const checkpoint = await storedLedger(key);
+        if (checkpoint) {
+          ledgers[index] = checkpoint;
+          completed += 1;
+          onProgress?.({
+            phase: 'analyzing', completed, total: chunks.length,
+            message: `Restored saved excerpt ${index + 1} of ${chunks.length}`,
+            excerpt: { index: index + 1, total: chunks.length, source: sourceLabel, state: 'restored', summary: checkpoint.summary },
+          });
+          continue;
+        }
+        onProgress?.({
+          phase: 'analyzing', completed, total: chunks.length,
+          message: `Parallel reader opened excerpt ${index + 1} of ${chunks.length} with ${connection.providerName}`,
+          excerpt: { index: index + 1, total: chunks.length, source: sourceLabel, state: 'working' },
+        });
+        const ledger = await analyzeChunk(adapter, chunks[index], index, chunks.length, (receivedCharacters) => {
+          onProgress?.({
+            phase: 'analyzing', completed, total: chunks.length,
+            message: `${connection.providerName} is writing excerpt ${index + 1} of ${chunks.length}`,
+            excerpt: { index: index + 1, total: chunks.length, source: sourceLabel, state: 'streaming', receivedCharacters },
+          });
+        });
+        ledgers[index] = ledger;
+        await rememberLedger(key, ledger);
+        completed += 1;
+        onProgress?.({
+          phase: 'analyzing', completed, total: chunks.length,
+          message: ledger.recoveredLocally ? `Recovered and saved excerpt ${index + 1} of ${chunks.length} on this device` : `Saved excerpt ${index + 1} of ${chunks.length} on this device`,
+          excerpt: { index: index + 1, total: chunks.length, source: sourceLabel, state: ledger.recoveredLocally ? 'recovered' : 'saved', summary: ledger.summary },
+        });
+      } catch (error) {
+        firstError ??= error;
+        stopScheduling = true;
+        return;
+      }
     }
-    onProgress?.({
-      phase: 'analyzing', completed: index, total: chunks.length,
-      message: `Sending excerpt ${index + 1} of ${chunks.length} to ${connection.providerName}`,
-      excerpt: { index: index + 1, total: chunks.length, source: sourceLabel, state: 'working' },
-    });
-    const ledger = await analyzeChunk(adapter, chunks[index], index, chunks.length, (receivedCharacters) => {
-      onProgress?.({
-        phase: 'analyzing', completed: index, total: chunks.length,
-        message: `${connection.providerName} is writing excerpt ${index + 1} of ${chunks.length}`,
-        excerpt: { index: index + 1, total: chunks.length, source: sourceLabel, state: 'streaming', receivedCharacters },
-      });
-    });
-    ledgers.push(ledger);
-    await rememberLedger(key, ledger);
-    onProgress?.({
-      phase: 'analyzing', completed: index + 1, total: chunks.length,
-      message: ledger.recoveredLocally ? `Recovered and saved excerpt ${index + 1} of ${chunks.length} on this device` : `Saved excerpt ${index + 1} of ${chunks.length} on this device`,
-      excerpt: { index: index + 1, total: chunks.length, source: sourceLabel, state: ledger.recoveredLocally ? 'recovered' : 'saved', summary: ledger.summary },
-    });
-  }
+  };
+
+  await Promise.all(Array.from({ length: concurrency }, worker));
+  if (firstError) throw firstError;
 
   const byId = new Map(sentences.map((sentence) => [sentence.id, sentence]));
   onProgress?.({ phase: 'synthesizing', completed: chunks.length, total: chunks.length + 1, message: `Combining the grounded ledger into a whole-book guide with ${connection.providerName}` });

@@ -12,6 +12,7 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "test": "tsx --test tests/*.test.ts",
     "guide:run": "tsx scripts/run-guide.ts",
+    "guide:chapters": "tsx scripts/run-chapter-deep-dives.ts",
     "relay:dev": "npx wrangler@latest dev --config relay/wrangler.jsonc",
     "relay:dry-run": "npx wrangler@latest deploy --config relay/wrangler.jsonc --dry-run",
     "relay:deploy": "npx wrangler@latest deploy --config relay/wrangler.jsonc"

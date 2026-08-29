@@ -328,6 +328,7 @@ export default function Home() {
   const [aiConnection, setAiConnection] = useState<ModelConnection | null>(null);
   const [processingProgress, setProcessingProgress] = useState<SemanticProgress | null>(null);
   const [excerptProgress, setExcerptProgress] = useState<VisibleExcerptProgress[]>([]);
+  const [parallelReaders, setParallelReaders] = useState(8);
 
   const chooseFile = (next?: File) => {
     if (!next) return;
@@ -356,7 +357,7 @@ export default function Home() {
     if (status !== 'error') setExcerptProgress([]);
     setProcessingProgress({ phase: 'extracting', completed: 0, total: 1, message: 'Opening the book locally' });
     try {
-      const result = await processBook(file, { connection: aiConnection, onProgress: (progress) => {
+      const result = await processBook(file, { connection: aiConnection, semanticConcurrency: aiConnection ? parallelReaders : 1, onProgress: (progress) => {
         setProcessingProgress(progress);
         if (!progress.excerpt) return;
         setExcerptProgress((current) => {
@@ -409,6 +410,10 @@ export default function Home() {
             <div className="drop-copy"><strong>{file?.name || 'Bring your own book'}</strong><p>{file ? 'Ready to build your private reading guide.' : 'Drag in a PDF or EPUB, or choose a file from your device.'}</p></div>
             <button className="primary-button" type="button" onClick={buildGuide} disabled={status === 'processing'}>{status === 'processing' ? 'Reading…' : file ? `Build ${summaryModes[mode].name}` : 'Choose a book'}</button>
           </div>
+          {aiConnection && <div className="parallel-control">
+            <div><span>Parallel reading</span><strong>{parallelReaders} readers</strong><p>Analyze several source excerpts at once. Leafmark slows down automatically if your provider asks it to.</p></div>
+            <label><span className="sr-only">Parallel readers</span><select value={parallelReaders} onChange={(event) => setParallelReaders(Number(event.target.value))} disabled={status === 'processing'}><option value={1}>1 · Careful</option><option value={4}>4 · Balanced</option><option value={8}>8 · Fast</option><option value={17}>17 · Maximum</option></select></label>
+          </div>}
           {status === 'processing' && <div className="processing-bar" role="status"><span /><p><b>{aiConnection ? `Building with ${aiConnection.providerName}…` : 'Reading your book locally…'}</b> {processingProgress?.message || 'Tracing every insight back to its source.'}{processingProgress && processingProgress.total > 1 ? ` · ${Math.min(processingProgress.completed + (processingProgress.phase === 'extracting' ? 1 : 0), processingProgress.total)} of ${processingProgress.total}` : ''}</p></div>}
           {(status === 'processing' || status === 'error') && <LiveReadingLedger excerpts={excerptProgress} error={status === 'error' ? error : undefined} />}
           {status === 'error' && <div className="error-message" role="alert"><b>Couldn’t build this guide.</b><span>{error}</span><button type="button" onClick={buildGuide}>Try again</button></div>}
