@@ -110,11 +110,53 @@ async function extractPdf(file: File, onProgress?: (progress: SemanticProgress) 
   if (runningInBrowser) pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
   const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
   const metadata = await pdf.getMetadata().catch(() => null);
+  type OutlineItem = { title?: string; dest?: string | unknown[] | null; items?: OutlineItem[] };
+  type OutlineEntry = { title: string; page: number; depth: number };
+  const outline = maxPages ? null : await pdf.getOutline().catch(() => null) as OutlineItem[] | null;
+  const outlineItems: Array<{ item: OutlineItem; depth: number }> = [];
+  const flattenOutline = (items: OutlineItem[], depth = 0) => items.forEach((item) => {
+    outlineItems.push({ item, depth });
+    if (item.items?.length) flattenOutline(item.items, depth + 1);
+  });
+  if (outline) flattenOutline(outline);
+  const outlineEntries: OutlineEntry[] = [];
+  for (const { item, depth } of outlineItems) {
+    try {
+      const destination = typeof item.dest === 'string' ? await pdf.getDestination(item.dest) : item.dest;
+      const reference = Array.isArray(destination) ? destination[0] : undefined;
+      if (!reference || typeof reference !== 'object') continue;
+      const page = await pdf.getPageIndex(reference as Parameters<typeof pdf.getPageIndex>[0]) + 1;
+      const title = normalize(item.title ?? '');
+      if (title) outlineEntries.push({ title, page, depth });
+    } catch {
+      // Ignore malformed outline destinations and retain the page-group fallback.
+    }
+  }
+  const numberWord = 'one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|twenty-one|twenty-two|twenty-three|twenty-four|twenty-five|twenty-six|twenty-seven|twenty-eight|twenty-nine|thirty';
+  const chapterTitle = new RegExp(`^(?:(?:chapter|book)\\s+)?(?:\\d{1,3}|[ivxlcdm]+|${numberWord})(?:\\s*[:.)-]|\\s+)`, 'i');
+  const excludedOutline = /^(?:appendix|notes?|index|contents?|acknowledg|glossary|bibliography|references?)\b/i;
+  const chapterMarkers = outlineEntries
+    .filter((entry) => chapterTitle.test(entry.title) && !excludedOutline.test(entry.title))
+    .filter((entry, index, entries) => index === 0 || entry.page !== entries[index - 1].page)
+    .sort((a, b) => a.page - b.page);
+  const useChapterOutline = chapterMarkers.length >= 2;
+  let extractionStart = 1;
+  let extractionEnd = maxPages ? Math.min(pdf.numPages, Math.max(1, Math.floor(maxPages))) : pdf.numPages;
+  if (useChapterOutline) {
+    const firstChapter = chapterMarkers[0];
+    const introduction = outlineEntries.filter((entry) => entry.page < firstChapter.page && /^(?:introduction|prologue|preface)\b/i.test(entry.title)).at(-1);
+    extractionStart = introduction?.page ?? firstChapter.page;
+    const lastChapter = chapterMarkers.at(-1)!;
+    const epilogue = outlineEntries.find((entry) => entry.page > lastChapter.page && /^(?:epilogue|conclusion|afterword)\b/i.test(entry.title));
+    const tail = epilogue ?? lastChapter;
+    const nextBoundary = outlineEntries.find((entry) => entry.page > tail.page && entry.depth <= tail.depth);
+    extractionEnd = Math.min(pdf.numPages, nextBoundary ? nextBoundary.page - 1 : tail === lastChapter ? pdf.numPages : tail.page + 20);
+  }
   const pages: SourceSegment[] = [];
-  const pageCount = maxPages ? Math.min(pdf.numPages, Math.max(1, Math.floor(maxPages))) : pdf.numPages;
+  const pageCount = extractionEnd - extractionStart + 1;
 
-  for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
-    onProgress?.({ phase: 'extracting', completed: pageNumber - 1, total: pageCount, message: `Reading page ${pageNumber} of ${pageCount} locally` });
+  for (let pageNumber = extractionStart; pageNumber <= extractionEnd; pageNumber += 1) {
+    onProgress?.({ phase: 'extracting', completed: pageNumber - extractionStart, total: pageCount, message: `Reading PDF page ${pageNumber} locally` });
     const page = await pdf.getPage(pageNumber);
     const content = await page.getTextContent();
     const text = normalize(content.items.map((item) => ('str' in item ? item.str : '')).join(' '));
@@ -122,17 +164,33 @@ async function extractPdf(file: File, onProgress?: (progress: SemanticProgress) 
   }
 
   const segments: SourceSegment[] = [];
-  for (let index = 0; index < pages.length; index += 8) {
-    const group = pages.slice(index, index + 8);
-    const start = group[0].pageStart!;
-    const end = group[group.length - 1].pageEnd!;
-    segments.push({
-      title: `Pages ${start}–${end}`,
-      text: group.map((page) => page.text).join(' '),
-      source: start === end ? `p. ${start}` : `pp. ${start}–${end}`,
-      pageStart: start,
-      pageEnd: end,
+  if (useChapterOutline) {
+    chapterMarkers.forEach((marker, index) => {
+      const start = index === 0 ? extractionStart : marker.page;
+      const end = index < chapterMarkers.length - 1 ? chapterMarkers[index + 1].page - 1 : extractionEnd;
+      const group = pages.filter((page) => page.pageStart! >= start && page.pageEnd! <= end);
+      if (!group.length) return;
+      segments.push({
+        title: marker.title,
+        text: group.map((page) => page.text).join(' '),
+        source: start === end ? `p. ${start}` : `pp. ${start}–${end}`,
+        pageStart: start,
+        pageEnd: end,
+      });
     });
+  } else {
+    for (let index = 0; index < pages.length; index += 8) {
+      const group = pages.slice(index, index + 8);
+      const start = group[0].pageStart!;
+      const end = group[group.length - 1].pageEnd!;
+      segments.push({
+        title: `Pages ${start}–${end}`,
+        text: group.map((page) => page.text).join(' '),
+        source: start === end ? `p. ${start}` : `pp. ${start}–${end}`,
+        pageStart: start,
+        pageEnd: end,
+      });
+    }
   }
 
   const info = metadata?.info as { Title?: string } | undefined;
@@ -230,6 +288,7 @@ export type ProcessBookOptions = {
   connection?: ModelConnection | null;
   onProgress?: (progress: SemanticProgress) => void;
   maxPdfPages?: number;
+  semanticConcurrency?: number;
 };
 
 export async function processBook(file: File, options: ProcessBookOptions = {}): Promise<BookGuide> {
@@ -241,7 +300,7 @@ export async function processBook(file: File, options: ProcessBookOptions = {}):
       title: extracted.title || file.name.replace(/\.(pdf|epub)$/i, ''),
       fileName: file.name,
       segments: extracted.segments,
-    }, options.connection, options.onProgress);
+    }, options.connection, options.onProgress, undefined, { maxConcurrency: options.semanticConcurrency });
   }
   options.onProgress?.({ phase: 'assembling', completed: 1, total: 1, message: 'Building the local extractive guide on this device' });
   return createGuide(file, extracted.title, extracted.segments);

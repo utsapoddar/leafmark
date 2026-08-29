@@ -150,6 +150,38 @@ test('successful ledger chunks resume from an in-memory checkpoint', async () =>
   assert.ok(messages.some((message) => message.includes('Restored saved excerpt')));
 });
 
+test('parallel readers analyze multiple excerpts concurrently and preserve the final source order', async () => {
+  clearSemanticCheckpoints();
+  let active = 0;
+  let maximumActive = 0;
+  const completedCounts: number[] = [];
+  const parallelAdapter: SemanticAdapter = {
+    async complete(request) {
+      if (!request.prompt.includes('LEAFMARK_TASK: LEDGER_CHUNK')) return fakeAdapter.complete(request);
+      active += 1;
+      maximumActive = Math.max(maximumActive, active);
+      const chunkNumber = Number(request.prompt.match(/Chunk (\d+) of/)?.[1] ?? 1);
+      await new Promise((resolve) => setTimeout(resolve, (5 - Math.min(chunkNumber, 4)) * 5));
+      active -= 1;
+      return fakeAdapter.complete(request);
+    },
+  };
+  const segments = [
+    { title: 'First', source: 'pp. 1–8', text: makeBookText(95) },
+    { title: 'Second', source: 'pp. 9–16', text: makeBookText(95) },
+  ];
+  const guide = await createSemanticGuide(
+    { title: 'Parallel fixture', fileName: 'parallel.pdf', segments },
+    connection,
+    (event) => { if (event.excerpt && ['saved', 'restored', 'recovered'].includes(event.excerpt.state)) completedCounts.push(event.completed); },
+    parallelAdapter,
+    { maxConcurrency: 4 },
+  );
+  assert.ok(maximumActive >= 2);
+  assert.deepEqual(completedCounts, completedCounts.map((_, index) => index + 1));
+  assert.deepEqual(guide.deepDive.map((item) => item.source), ['pp. 1–8', 'pp. 9–16']);
+});
+
 test('OpenAI-compatible adapter sends the common chat-completions request', async () => {
   let capturedUrl = '';
   let capturedInit: RequestInit | undefined;
