@@ -109,8 +109,8 @@ The current GitHub Pages release implements the first production slice of this d
 - conservative, source-labeled chunking that works without a provider-specific context database;
 - a validated ledger of sentence importance and source-grounded insights;
 - JSON repair, bounded transient-error retries, and actionable provider errors;
-- an in-memory per-chunk checkpoint that survives retries and provider changes within the tab;
+- a per-chunk checkpoint, held in memory and in this browser's IndexedDB, that survives retries, refreshes, and provider changes;
 - a separate ledger synthesis pass for Snapshot and Key Ideas; and
 - local assembly of Chapter Guide and Deep Dive at approximately 55% and 80% source coverage.
 
-The checkpoint deliberately does not persist book material to browser storage. A future encrypted or explicitly enabled persistent checkpoint requires a corresponding privacy-policy and deletion-control update.
+Checkpoints hold validated summary ledgers and page references, not the uploaded file or the API key, and the privacy policy discloses them. They persist until the site's browser data is cleared; an in-app deletion control is still to be built.

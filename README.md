@@ -17,13 +17,14 @@ The initial engine is deliberately extractive. It ranks and assembles sentences 
 
 Reading times are estimates, not limits. A short story can produce a guide under an hour; an unusually long work can produce one well beyond five hours. Depth is determined by the share of substantive source material retained, and the result screen reports the actual estimated reading time generated from the uploaded text.
 
-## Why this shape
+## How it works
 
-- Blinkist packages nonfiction books into editorial 15-minute text and audio summaries organized around several key insights.
-- Deepstash packages knowledge as short, independent idea cards that people can save and revisit.
-- Shortform goes deeper with chapter-level guides, analysis, and exercises.
+1. **Parse in the browser.** PDF.js reads PDFs; JSZip and DOM APIs read EPUBs. Every sentence keeps its page or section reference, and chapters are detected from the book's outline (`lib/book-processor.ts`).
+2. **Local engine (default).** An extractive ranker selects and assembles source sentences on the device. There is no model call and no network request.
+3. **Optional model path** (`lib/semantic-kernel.ts`). Source sentences are chunked, and each chunk goes to the reader's chosen provider (`lib/model-providers.ts`: Gemini, Groq, Cerebras, Kimi, NVIDIA via relay, or any OpenAI-compatible endpoint) for a structured content ledger. Requests retry with backoff on 429 and 5xx. A malformed response gets one JSON-repair pass; if that also fails validation, the run stops with a clear error. Each validated chunk is checkpointed, so a retry, refresh, or model switch resumes instead of starting over.
+4. **Assemble on the device.** The short views are synthesized from the ledger, the long views are assembled from source sentences, and the guide exports as Markdown.
 
-Leafmark combines the useful interaction patterns—quick overview, idea cards, and chapter depth—but uses a bring-your-own-book model so it does not need to license, host, or distribute a commercial catalog.
+Leafmark uses a bring-your-own-book model, so it does not license, host, or distribute a commercial catalog.
 
 ## Bring your own model
 
@@ -35,7 +36,7 @@ Future improvements should preserve the same boundary:
 
 1. Add opt-in browser OCR for scanned pages.
 2. Add an optional on-device language model for abstractive summaries on capable hardware.
-3. Add an explicitly enabled persistent checkpoint with clear deletion controls; the current checkpoint is tab-memory only.
+3. Add an in-app control to delete saved excerpt checkpoints. They are currently kept in this browser's IndexedDB until the site's data is cleared (see the [privacy page](https://utsapoddar.github.io/leafmark/privacy/)).
 4. Add a question mode whose answers always cite extracted sections.
 5. Store a local library in IndexedDB, with explicit delete controls.
 6. Add [Lecture Mode](docs/lecture-mode.md): a source-grounded teaching sequence that explains one idea at a time, checks recall, adapts the next explanation, and never advances silently past a misunderstanding.
@@ -48,4 +49,6 @@ Do not build a public repository of user-generated summaries for copyrighted boo
 npm install
 npm run dev
 npm run build
+npm test        # 31 tests: book processing, providers, relay, semantic kernel
+npm run lint
 ```
