@@ -106,8 +106,9 @@ const zipPath = (baseFile: string, relative: string) => {
 
 async function extractPdf(file: File, onProgress?: (progress: SemanticProgress) => void, maxPages?: number): Promise<{ title?: string; segments: SourceSegment[] }> {
   const runningInBrowser = typeof window !== 'undefined';
-  const pdfjs = runningInBrowser ? await import('pdfjs-dist') : await import('pdfjs-dist/legacy/build/pdf.mjs');
-  if (runningInBrowser) pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
+  // The legacy build polyfills recent JS APIs (e.g. Map.prototype.getOrInsertComputed) that the modern build requires natively.
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  if (runningInBrowser) pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/legacy/build/pdf.worker.min.mjs', import.meta.url).toString();
   const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
   const metadata = await pdf.getMetadata().catch(() => null);
   type OutlineItem = { title?: string; dest?: string | unknown[] | null; items?: OutlineItem[] };
