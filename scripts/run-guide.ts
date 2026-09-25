@@ -1,8 +1,12 @@
 import { File as NodeFile } from 'node:buffer';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, resolve } from 'node:path';
+import { JSDOM } from 'jsdom';
 import { processBook } from '../lib/book-processor';
 import { providers, type ModelConnection, type ProviderId } from '../lib/model-providers';
+
+// The EPUB reader parses XHTML with the browser's DOMParser; Node has none, so borrow jsdom's.
+globalThis.DOMParser ??= new JSDOM().window.DOMParser;
 
 type Arguments = {
   file: string;
