@@ -4,6 +4,12 @@ Leafmark is a privacy-first book-summary web app. A reader brings a PDF or EPUB 
 
 Public site: https://utsapoddar.github.io/leafmark/
 
+## Architecture and walkthrough
+
+[![Leafmark architecture diagram](docs/media/architecture.png)](docs/media/architecture.png)
+
+**[Watch the one-minute project explainer →](docs/media/explainer.mp4)**
+
 ## Product model
 
 - **Snapshot:** a two-minute overview of the whole book.
