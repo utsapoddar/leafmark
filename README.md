@@ -8,7 +8,9 @@ Public site: https://utsapoddar.github.io/leafmark/
 
 [![Leafmark architecture diagram](docs/media/architecture.png)](docs/media/architecture.png)
 
-**[Watch the one-minute project explainer →](docs/media/explainer.mp4)**
+### Video walkthrough
+
+https://github.com/user-attachments/assets/9d83b676-4f97-4243-8acf-a98f6b0dfe40
 
 ## Product model
 
